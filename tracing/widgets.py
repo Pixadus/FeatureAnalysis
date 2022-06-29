@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon 6.28.22
+Created on Tue 6.28.22
 @title: Tracing GUI Components
 @author: Parker Lamb
 @description: Contains Qt6 widgets for automatically and manually tracing
@@ -256,7 +256,7 @@ class OCCULTParams(QWidget):
 
         for line in self.ax.get_lines():
             line.set_color(self.pcolor)
-            
+
         # Redraw everything
         self.ax.draw_artist(self.ax.patch)
         self.canvas.update()
@@ -319,12 +319,11 @@ class OCCULTParams(QWidget):
         dialog = QFileDialog()
         # We're saving a file, not opening here
         dialog.setAcceptMode(QFileDialog.AcceptSave)
-        # Allow to save as any file
         dialog.setFileMode(QFileDialog.AnyFile)
-        # Image is a tuple of (path, file_type)
+        # Returned path is a tuple of (path, file_type)
         save_path = dialog.getSaveFileName(self, "Save results", filter="CSV file (*.csv)")[0]
         
-        # Save format will be { fibril_id, x, y }
+        # Save format will be { feature_id, x, y }
         f_count = 0
         with open(save_path, 'w') as outfile:
             resultwriter = csv.writer(outfile)

@@ -29,7 +29,6 @@ class AutoTracingOCCULT:
         image_path : str
             Path to the image containing features to trace. Image must be in .fits format.
         """
-        
         self.path = image_path
 
         # Test if file is a FITS file

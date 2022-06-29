@@ -8,8 +8,10 @@ Created on Mon 6.27.22
 @usage: todo
 """
 
+from pydoc import Helper
 from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QTabWidget)
 from tracing.widgets import TracingWidget
+from helper.widgets import HelperWidget
 
 class FeatureTracing(QApplication):
     def __init__(self):
@@ -40,7 +42,7 @@ class FeatureTracing(QApplication):
             tabs.addTab(TracingWidget(),"Tracing")
             # tabs.addTab(label1,"Analysis")
             # tabs.addTab(label1,"Time Series")
-            # tabs.addTab(label1,"Miscellaneous")
+            tabs.addTab(HelperWidget(),"Helper functions")
 
             self.setCentralWidget(tabs)
 
