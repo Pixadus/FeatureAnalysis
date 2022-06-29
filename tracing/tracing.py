@@ -40,7 +40,7 @@ class AutoTracingOCCULT:
             raise Exception("Did not detect .fits extension in image path.")
 
     
-    def run(self, nsm1=4, rmin=45, lmin=35, nstruc=2000, ngap=1, qthresh1=0, qthresh2=3):
+    def run(self, nsm1=4, rmin=45, lmin=35, nstruc=2000, ngap=1, qthresh1=0.0, qthresh2=3.0):
         """
         Run OCCULT-2 with given parameters. 
 

@@ -9,6 +9,7 @@ Created on Mon 6.27.22
 """
 
 from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QTabWidget)
+from tracing.widgets import TracingWidget
 
 class FeatureTracing(QApplication):
     def __init__(self):
@@ -32,15 +33,17 @@ class FeatureTracing(QApplication):
         
             # Set up all the tabs
             tabs = QTabWidget()
-
             tabs.setDocumentMode(True)
 
+            # Demo label - REMOVE
+            label = QLabel("Demo for preprocessing")
+
             # Add new widgets for each page
-            tabs.addTab(label0,"Preprocessing")
-            tabs.addTab(label1,"Tracing")
-            tabs.addTab(label1,"Analysis")
-            tabs.addTab(label1,"Time Series")
-            tabs.addTab(label1,"Miscellaneous")
+            tabs.addTab(label,"Preprocessing")
+            tabs.addTab(TracingWidget(),"Tracing")
+            # tabs.addTab(label1,"Analysis")
+            # tabs.addTab(label1,"Time Series")
+            # tabs.addTab(label1,"Miscellaneous")
 
             self.setCentralWidget(tabs)
 
