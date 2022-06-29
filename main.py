@@ -28,18 +28,15 @@ class FeatureTracing(QApplication):
             # Application setup and backend
             self.version = 0.1
             self.title = "Feature Tracing v{}".format(self.version)
-            self.resize(800,600)
+            self.resize(850,600)
             self.setWindowTitle(self.title)
         
             # Set up all the tabs
             tabs = QTabWidget()
             tabs.setDocumentMode(True)
 
-            # Demo label - REMOVE
-            label = QLabel("Demo for preprocessing")
-
             # Add new widgets for each page
-            tabs.addTab(label,"Preprocessing")
+            # tabs.addTab(label,"Preprocessing")
             tabs.addTab(TracingWidget(),"Tracing")
             # tabs.addTab(label1,"Analysis")
             # tabs.addTab(label1,"Time Series")

@@ -9,14 +9,15 @@ curvilinear features.
 """
 
 from PySide6.QtGui import QPalette
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout,
-                            QGroupBox, QHBoxLayout, QLabel, 
-                            QLineEdit, QPushButton, QTabWidget, 
-                            QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QColorDialog, QComboBox, QFileDialog, 
+                            QFormLayout, QGroupBox, QHBoxLayout, 
+                            QLabel, QLineEdit, QPushButton,
+                            QTabWidget, QVBoxLayout, QWidget)
 from astropy.io import fits
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib import (pyplot, colors)
 from tracing.tracing import AutoTracingOCCULT
+import csv
 
 class TracingWidget(QWidget):
     def __init__(self):
@@ -76,7 +77,7 @@ class TracingWidget(QWidget):
             f = fits.open(image_path, ignore_missing_end=True)
             self.ax.cla()
             self.ax.imshow(f[0].data, origin="lower")
-            self.autoTab.occult.update_buttons(image_path)
+            self.autoTab.occult.update_buttons(image_path, f[0].data)
             self.canvas.draw()
 
 class AutoTab(QWidget):
@@ -106,10 +107,12 @@ class OCCULTParams(QWidget):
         """
         super().__init__()
 
-        # Image path is initially "None"
+        # Initial variable values
         self.image_path = None
         self.canvas = None
         self.ax = None
+        self.results = None
+        self.pcolor = (0,0,1,1)
 
         # Layout for the section
         layout = QVBoxLayout(self)
@@ -150,6 +153,33 @@ class OCCULTParams(QWidget):
         # Add parameters box to global box
         layout.addWidget(params)
 
+        # Add plot configuration box
+        plotConfig = QGroupBox()
+        plotConfigLayout = QFormLayout()
+        plotConfig.setLayout(plotConfigLayout)
+        plotConfig.setTitle("Plot Config")
+
+        # Add color map configuration
+        cmaps = ['viridis', 'gray', 'inferno']
+        self.cmapBox = QComboBox()
+        self.cmapBox.addItems(cmaps)
+        plotConfigLayout.addRow(QLabel("Color map:"), self.cmapBox)
+
+        # Whenever a new cmap is selected, update it in the plot
+        self.cmapBox.currentIndexChanged.connect(self.set_cmap)
+
+        # Disable cmapBox until enabled after trace
+        self.cmapBox.setEnabled(False)
+
+        # Add plot color configuration
+        self.colorPicker = QColorDialog()
+        self.colorButton = QPushButton("Select")
+        self.colorButton.clicked.connect(self.set_color)
+        plotConfigLayout.addRow(QLabel("Line color:"), self.colorButton)
+
+        # Add plot config box to OCCULT box
+        layout.addWidget(plotConfig)
+
         # Add horizontal button group
         buttonLayout = QHBoxLayout()
 
@@ -157,33 +187,34 @@ class OCCULTParams(QWidget):
         self.traceButton = QPushButton("Trace")
         self.saveButton = QPushButton("Save")
 
-        # Trace button configuration
+        # Disable buttons until enabled by functions
+        self.traceButton.setEnabled(False)
+        self.saveButton.setEnabled(False)
+
+        # Button configuration
         self.traceButton.clicked.connect(self.run_occult)
+        self.saveButton.clicked.connect(self.save_results)
         
         # Add buttons to layout
         buttonLayout.addWidget(self.traceButton)
         buttonLayout.addWidget(self.saveButton)
 
-        # Update the button states to reflect the current image path
-        self.update_buttons(self.image_path)
-
         # Add sub-layout to params layout
         layout.addLayout(buttonLayout)
 
-    def update_buttons(self, image_path):
+    def update_buttons(self, image_path, image_data):
         """
-        Update the buttons at the bottom if the image path
-        is updated.
+        Enable some elements if the image path becomes valid.
         """
-
         if image_path == None:
             self.traceButton.setEnabled(False)
-            self.saveButton.setEnabled(False)
+            self.cmapBox.setEnabled(False)
         else:
             self.traceButton.setEnabled(True)
-            self.saveButton.setEnabled(True)
+            self.cmapBox.setEnabled(True)
 
         self.image_path = image_path
+        self.image_data = image_data
 
     def set_mpl(self, canvas, ax):
         """
@@ -200,6 +231,38 @@ class OCCULTParams(QWidget):
         self.canvas = canvas
         self.ax = ax
 
+    def set_cmap(self):
+        """
+        Set the colormap for the figure
+        """
+        self.ax.imshow(self.image_data, origin="lower", cmap=self.cmapBox.currentText())
+
+        # Redraw everything
+        self.ax.draw_artist(self.ax.patch)
+        self.canvas.update()
+        self.canvas.flush_events()
+        self.canvas.draw()
+    
+    def set_color(self):
+        """
+        Sets the color of the current plot.
+        """
+        color = self.colorPicker.getColor()
+
+        try:
+            self.pcolor = tuple(c/255 for c in color.toTuple())
+        except:
+            return
+
+        for line in self.ax.get_lines():
+            line.set_color(self.pcolor)
+            
+        # Redraw everything
+        self.ax.draw_artist(self.ax.patch)
+        self.canvas.update()
+        self.canvas.flush_events()
+        self.canvas.draw()
+
     def run_occult(self):
         """
         Run OCCULT-2 using paramers attached to self.
@@ -215,7 +278,7 @@ class OCCULTParams(QWidget):
         at = AutoTracingOCCULT(self.image_path)
 
         # Run OCCULT-2
-        results = at.run(
+        self.results = at.run(
             int(self.nsm1.displayText()),
             int(self.rmin.text()),
             int(self.lmin.text()),
@@ -229,15 +292,44 @@ class OCCULTParams(QWidget):
         self.ax.cla()
 
         # Reset the image, since it's cleared with cla()
-        f = fits.open(self.image_path, ignore_missing_end=True)
-        self.ax.imshow(f[0].data, origin="lower")
+        self.ax.imshow(self.image_data, origin="lower")
 
         # Plot the results
-        for result in results:
+        for result in self.results:
             x = []
             y = []
             for coord in result:
                 x.append(coord[0])
                 y.append(coord[1])
-            self.ax.plot(x,y, color="blue")
+            self.ax.plot(x,y, color=self.pcolor)
+
+        # Refresh the canvas
+        self.ax.draw_artist(self.ax.patch)
+        self.canvas.update()
+        self.canvas.flush_events()
         self.canvas.draw()
+
+        # Enable the save & color buttons
+        self.saveButton.setEnabled(True)
+
+    def save_results(self):
+        """
+        Save the feature trace results.
+        """
+        dialog = QFileDialog()
+        # We're saving a file, not opening here
+        dialog.setAcceptMode(QFileDialog.AcceptSave)
+        # Allow to save as any file
+        dialog.setFileMode(QFileDialog.AnyFile)
+        # Image is a tuple of (path, file_type)
+        save_path = dialog.getSaveFileName(self, "Save results", filter="CSV file (*.csv)")[0]
+        
+        # Save format will be { fibril_id, x, y }
+        f_count = 0
+        with open(save_path, 'w') as outfile:
+            resultwriter = csv.writer(outfile)
+            for result in self.results:
+                f_count+=1
+                for coord in result:
+                        # TODO verify this is x,y and not y,x
+                        resultwriter.writerow([f_count, coord[0], coord[1]])
