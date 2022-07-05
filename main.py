@@ -12,6 +12,7 @@ from pydoc import Helper
 from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QTabWidget)
 from tracing.widgets import TracingWidget
 from helper.widgets import HelperWidget
+from analysis.widgets import AnalysisWidget
 
 class FeatureTracing(QApplication):
     def __init__(self):
@@ -40,7 +41,7 @@ class FeatureTracing(QApplication):
             # Add new widgets for each page
             # tabs.addTab(label,"Preprocessing")
             tabs.addTab(TracingWidget(),"Tracing")
-            # tabs.addTab(label1,"Analysis")
+            tabs.addTab(AnalysisWidget(),"Analysis")
             # tabs.addTab(label1,"Time Series")
             tabs.addTab(HelperWidget(),"Helper functions")
 

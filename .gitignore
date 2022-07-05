@@ -1,3 +1,7 @@
 # Ignore __pycache__ files
 __pycache__
 */__pycache__
+
+# Ignore .sav image files
+data/images/sav
+data/images/*sav*/*.sav
