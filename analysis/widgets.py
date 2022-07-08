@@ -10,7 +10,7 @@ and custom parameters.
 """
 
 from PySide6.QtGui import QPalette
-from PySide6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, QLabel, QPushButton, QVBoxLayout, QWidget)
 from matplotlib import (pyplot, colors)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from astropy.io import fits
@@ -25,6 +25,8 @@ class AnalysisWidget(QWidget):
         is selected.
         """
         super().__init__()
+
+        # TODO we need a way to modify breadth params
         
         # Layout for the whole tab window
         layout = QVBoxLayout(self)
@@ -129,68 +131,114 @@ class AnalysisWidget(QWidget):
 
         # Create a results box
         resultsBox = QGroupBox("Results")
-        resultsLayout = QFormLayout()
-        resultsBox.setLayout(resultsLayout)
+        self.resultsBoxLayout = QFormLayout()
+        resultsBox.setLayout(self.resultsBoxLayout)
         resultLayout.addWidget(resultsBox)
 
-    def open_image(self):
+        # Create a 'save' button
+        self.saveButton = QPushButton("Save data")
+        resultLayout.addWidget(self.saveButton)
+
+        # Set click functionality of the saveButton
+        self.saveButton.clicked.connect(self.save_results)
+
+        # Disable saveButton by default
+        self.saveButton.setEnabled(False)
+
+    def open_image(self, ex_img=None):
         """
         Open a file browser and select an image.
+
+        Parameters
+        ----------
+        ex_img : ndarray
+            External image data, sent by the tracing tab.
         """
-        dialog = QFileDialog()
-        # Only allow single, existing files
-        dialog.setFileMode(QFileDialog.ExistingFile)
-        # Image is a tuple of (path, file_type)
-        image_path = dialog.getOpenFileName(self, "Open image", filter="FITS file (*.fits)")[0]
-        # Try to open data and set graph image
-        try:
-            f = fits.open(image_path, ignore_missing_end=True)
-            self.img_data = f[0].data
-            self.ax.cla()
-            self.ax.imshow(self.img_data, origin="lower")
-            # Refresh the canvas
-            self.ax.draw_artist(self.ax.patch)
-            self.canvas.update()
-            self.canvas.flush_events()
+        # External image is supplied
+        if ex_img:
+            self.img_data = ex_img[0]
             self.canvas.draw()
-            self.openDataButton.setEnabled(True)
-        except:
-            print("Error opening image.")
+
+        # No external image is supplied
+        else:
+            dialog = QFileDialog()
+            # Only allow single, existing files
+            dialog.setFileMode(QFileDialog.ExistingFile)
+            # Image is a tuple of (path, file_type)
+            image_path = dialog.getOpenFileName(self, "Open image", filter="FITS file (*.fits)")[0]
+            # Try to open data and set graph image
+            try:
+                f = fits.open(image_path, ignore_missing_end=True)
+                self.img_data = f[0].data
+            except:
+                print("Error opening image.")
+                return
+        
+        self.ax.cla()
+        self.ax.imshow(self.img_data, origin="lower")
+        # Refresh the canvas
+        self.ax.draw_artist(self.ax.patch)
+        self.canvas.update()
+        self.canvas.flush_events()
+        self.canvas.draw()
+        self.openDataButton.setEnabled(True)
     
-    def open_data(self):
+    def open_data(self, ex_data=None):
         """
         Open file browser and select a .csv feature
         data file.
+
+        Parameters
+        ----------
+        ex_data : list
+            List of lists, optionally supplied from 
+            tracing tab.
         """
-        dialog = QFileDialog()
-        # Only allow single, existing files
-        dialog.setFileMode(QFileDialog.ExistingFile)
-        # Image is a tuple of (path, file_type)
-        data_path = dialog.getOpenFileName(self, "Open datafile", filter="CSV file (*.csv)")[0]
-        if len(data_path) == 0:
-            return
-        # Try to open data and set graph data
-        with open(data_path) as datafile:
-            data = csv.reader(datafile)
+        # External data is supplied
+        if ex_data:
             f_num = 0
             self.f_data = OrderedDict()
-            # Initialize an empty coordinate list
-            self.f_data[f_num] = []
-            for row in data:
-                # If a coordinate in the same feature
-                if int(row[0]) == f_num:
-                    coord = {"coord" : (float(row[1]), float(row[2]))}
-                    self.f_data[f_num].append(coord)
-                # If a new feature
-                else:
-                    x = [c["coord"][0] for c in self.f_data[f_num]]
-                    y = [c["coord"][1] for c in self.f_data[f_num]]
-                    self.ax.plot(x,y, color="blue", linewidth=1, markersize=1)
-                    # Set the new feature number
-                    f_num = int(row[0])
-                    coord = {"coord" : (float(row[1]), float(row[2]))}
-                    # Initialize the coordinate list, add current coord
-                    self.f_data[f_num] = [coord]
+            for feature in ex_data:
+                self.f_data[f_num] = []
+                for coord in feature:
+                    c = {"coord" : (float(coord[0]), float(coord[1]))}
+                    self.f_data[f_num].append(c)
+                x = [c["coord"][0] for c in self.f_data[f_num]]
+                y = [c["coord"][1] for c in self.f_data[f_num]]
+                self.ax.plot(x,y, color="blue", linewidth=1, markersize=1)
+                f_num += 1
+
+        # No external data is supplied
+        else:
+            dialog = QFileDialog()
+            # Only allow single, existing files
+            dialog.setFileMode(QFileDialog.ExistingFile)
+            # Image is a tuple of (path, file_type)
+            data_path = dialog.getOpenFileName(self, "Open datafile", filter="CSV file (*.csv)")[0]
+            if len(data_path) == 0:
+                return
+            # Try to open data and set graph data
+            with open(data_path) as datafile:
+                data = csv.reader(datafile)
+                f_num = 0
+                self.f_data = OrderedDict()
+                # Initialize an empty coordinate list
+                self.f_data[f_num] = []
+                for row in data:
+                    # If a coordinate in the same feature
+                    if int(row[0]) == f_num:
+                        coord = {"coord" : (float(row[1]), float(row[2]))}
+                        self.f_data[f_num].append(coord)
+                    # If a new feature
+                    else:
+                        x = [c["coord"][0] for c in self.f_data[f_num]]
+                        y = [c["coord"][1] for c in self.f_data[f_num]]
+                        self.ax.plot(x,y, color="blue", linewidth=1, markersize=1)
+                        # Set the new feature number
+                        f_num = int(row[0])
+                        coord = {"coord" : (float(row[1]), float(row[2]))}
+                        # Initialize the coordinate list, add current coord
+                        self.f_data[f_num] = [coord]
 
         # Refresh the canvas
         self.ax.draw_artist(self.ax.patch)
@@ -278,6 +326,42 @@ class AnalysisWidget(QWidget):
         if self.custLayout.count() == 0:
             self.remButton.setEnabled(False)
 
+    def current_state(self):
+        """
+        Returns a list enabled params.
+        """
+        params = []
+        if self.checkBreadth.isChecked():
+            params.append('breadth')
+        if self.checkLength.isChecked():
+            params.append('length')
+        params = params + [c for c in self.custDict.keys()]
+        return(params)
+
+    def save_results(self):
+        """
+        Save the new data.
+        """
+        dialog = QFileDialog()
+        # We're saving a file, not opening here
+        dialog.setAcceptMode(QFileDialog.AcceptSave)
+        dialog.setFileMode(QFileDialog.AnyFile)
+        # Returned path is a tuple of (path, file_type)
+        save_path = dialog.getSaveFileName(self, "Save results", filter="CSV file (*.csv)")[0]
+        
+        # Save format will be { feature_id, x, y, len, bre, [cust] }
+        with open(save_path, 'w') as outfile:
+            resultwriter = csv.writer(outfile)
+            resultwriter.writerow(["f_num", 'x', 'y']+[state for state in self.current_state()])
+            for f_num in self.f_data.keys():
+                for coord in self.f_data[f_num]:
+                    resultwriter.writerow([
+                        f_num, 
+                        coord['coord'][0], 
+                        coord['coord'][1]
+                        ] + [coord[state] for state in self.current_state()]
+                        )
+
     def run_analysis(self):
         """
         Runs the analysis on self.data
@@ -290,10 +374,41 @@ class AnalysisWidget(QWidget):
             self.custDict
             )
 
-        analysis.run()
+        self.f_data = analysis.run()
+
+        # Enable the saveButton once analysis has been run
+        self.saveButton.setEnabled(True)
 
         # Refresh the canvas after the breadth updates
         self.ax.draw_artist(self.ax.patch)
         self.canvas.update()
         self.canvas.flush_events()
         self.canvas.draw()
+
+        # Calculate averages for each feature
+        f_avg = {}
+        # Populate dictionary
+        for key in self.current_state():
+            f_avg[key] = 0
+        # Create a running tally of coordinates
+        coord_count = 0
+        for f_num in self.f_data.keys():
+            for coord in self.f_data[f_num]:
+                coord_count += 1
+                for key in self.current_state():
+                    if coord[key]:
+                        f_avg[key] += coord[key]
+        # Average out the coordinates
+        for key in f_avg.keys():
+            f_avg[key] = f_avg[key]/coord_count
+        
+        # Reset resultBox
+        for i in reversed(range(self.resultsBoxLayout.rowCount())):
+            self.resultsBoxLayout.removeRow(i)
+        
+        # Add average to resultBox
+        self.resultsBoxLayout.insertRow(0, "Feature count:", QLabel(str(max([k for k in self.f_data.keys()]))))
+        n=1
+        for key in f_avg.keys():
+            self.resultsBoxLayout.insertRow(n, "Average "+key+":", QLabel(str(round(f_avg[key],2))))
+            n+=1

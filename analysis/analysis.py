@@ -8,6 +8,7 @@ Created on Tue 7.5.22
 both breadth and length, as well as optionally supplied features.
 """
 
+from decimal import ROUND_DOWN
 import numpy as np
 import cv2
 
@@ -35,12 +36,25 @@ class Analysis:
     def run(self):
         """
         Run the analysis.
+
+        Returns
+        -------
+        f_data : dict
+            Format {f_num : [
+                {'coord':(x,y), 'length':l, 'breadth':b ...},
+                {'coord':(x,y), 'length':l, 'breadth':b ...}
+                ...
+                ]}
         """
         # Take a look at all the custom options
         self.analyze_cust()
 
-        # Get the breadth of the fibrils
+        # Get the length + breadth of the features
         self.get_breadth()
+        self.get_length()
+
+        # Return the feature dictionary
+        return(self.f_data)
     
     def set_opts(self, opt_breadth=True, opt_length=True, opt_cust={}):
         """
@@ -78,7 +92,6 @@ class Analysis:
                     if key not in ["coord"]+[k for k in self.opt_cust.keys()]:
                         bad_keys.append(key)
                 for key in bad_keys:
-                    print(bad_keys)
                     coord.pop(key)
 
     def get_breadth(self):
@@ -149,21 +162,24 @@ class Analysis:
                 # Move in positive dp until we hit a Canny-identified edge
                 bp= 0
                 coord_offset = np.array([round(coord[1]),round(coord[0])])
-                while edges[coord_offset[0],coord_offset[1]] == 0:
-                    bp+=1
-                    xs.append(coord_offset[0])
-                    ys.append(coord_offset[1])
-                    coord_offset[0] = coord_offset[0]+dp[0]
-                    coord_offset[1] = coord_offset[1]+dp[1]
-                # Move in negative dp until we hit a Canny-identified edge
-                bn = 0
-                coord_offset = np.array([round(coord[1]),round(coord[0])])
-                while edges[coord_offset[0],coord_offset[1]] == 0:
-                    bn+=1
-                    xs.append(coord_offset[0])
-                    ys.append(coord_offset[1])
-                    coord_offset[0] = coord_offset[0]-dp[0]
-                    coord_offset[1] = coord_offset[1]-dp[1]
+                try:
+                    while edges[coord_offset[0],coord_offset[1]] == 0:
+                        bp+=1
+                        xs.append(coord_offset[0])
+                        ys.append(coord_offset[1])
+                        coord_offset[0] = coord_offset[0]+dp[0]
+                        coord_offset[1] = coord_offset[1]+dp[1]
+                    # Move in negative dp until we hit a Canny-identified edge
+                    bn = 0
+                    coord_offset = np.array([round(coord[1]),round(coord[0])])
+                    while edges[coord_offset[0],coord_offset[1]] == 0:
+                        bn+=1
+                        xs.append(coord_offset[0])
+                        ys.append(coord_offset[1])
+                        coord_offset[0] = coord_offset[0]-dp[0]
+                        coord_offset[1] = coord_offset[1]-dp[1]
+                except IndexError:
+                    pass
                 if (wctr % 5) == 0:
                     self.ax.plot(ys,xs,markersize=1,linewidth=1, color='#a09516', alpha=0.7)
                 # Add width to coord characteristics
@@ -171,3 +187,27 @@ class Analysis:
                 dict_coord['breadth'] = bp+bn
                 # TODO compare with previous coordinate width. If significantly larger, (i.e. 4 -> 12), set to previous
                 # coordinate width, as it's implied there is a error width here. 
+    
+    def get_length(self):
+        """
+        Calculate the length of all individual
+        features.
+        """
+        # Iterate over all features
+        for f_num in self.f_data.keys():
+            prevcoord = None
+            length = 0
+            # Iterate over all coordinate dictionaries in the feature
+            for coord_dict in self.f_data[f_num]:
+                # Retrieve coordinate from the c. dict
+                coord = coord_dict['coord']
+                # If it's the first coord, don't calculate anything
+                if self.f_data[f_num].index(coord_dict) == 0:
+                    prevcoord = coord
+                else:
+                    # Calculate distance between coords
+                    diff = tuple(map(lambda i, j: i - j, coord, prevcoord))
+                    length += np.linalg.norm(np.abs(diff))
+                    prevcoord = coord
+                # Add the current length to the coord_dict
+                coord_dict['length'] = length

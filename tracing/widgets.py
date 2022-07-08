@@ -131,7 +131,7 @@ class OCCULTParams(QWidget):
         self.rmin = QLineEdit()
         self.rmin.setPlaceholderText("45")
         self.lmin = QLineEdit()
-        self.lmin.setPlaceholderText("45")
+        self.lmin.setPlaceholderText("35")
         self.nstruc = QLineEdit()
         self.nstruc.setPlaceholderText("2000")
         self.ngap = QLineEdit()
@@ -183,20 +183,24 @@ class OCCULTParams(QWidget):
         # Add horizontal button group
         buttonLayout = QHBoxLayout()
 
-        # Add button to run the trace and to save the data
+        # Add button to save, trace and analyze the data
         self.traceButton = QPushButton("Trace")
         self.saveButton = QPushButton("Save")
+        self.analyzeButton = QPushButton("Analyze")
 
         # Disable buttons until enabled by functions
         self.traceButton.setEnabled(False)
         self.saveButton.setEnabled(False)
+        self.analyzeButton.setEnabled(False)
 
         # Button configuration
         self.traceButton.clicked.connect(self.run_occult)
         self.saveButton.clicked.connect(self.save_results)
+        self.analyzeButton.clicked.connect(self.analyze_results)
         
         # Add buttons to layout
-        buttonLayout.addWidget(self.traceButton)
+        layout.addWidget(self.traceButton)
+        buttonLayout.addWidget(self.analyzeButton)
         buttonLayout.addWidget(self.saveButton)
 
         # Add sub-layout to params layout
@@ -227,9 +231,22 @@ class OCCULTParams(QWidget):
         ax : Figure.Axes
             This function is only meant to be run internally
         """
-
         self.canvas = canvas
         self.ax = ax
+    
+    def set_at(self, analysis, tabs):
+        """
+        Set the analysis and tab widgets from main.py.
+
+        Parameters
+        ----------
+        analysis : AnalysisWidget
+            Necessary to set plot data on the analysis tab.
+        tabs : QTabWidget
+            Necessary to swap tabs.
+        """
+        self.analysis = analysis
+        self.tabs = tabs
 
     def set_cmap(self):
         """
@@ -311,6 +328,7 @@ class OCCULTParams(QWidget):
 
         # Enable the save & color buttons
         self.saveButton.setEnabled(True)
+        self.analyzeButton.setEnabled(True)
 
     def save_results(self):
         """
@@ -332,3 +350,16 @@ class OCCULTParams(QWidget):
                 for coord in result:
                         # TODO verify this is x,y and not y,x
                         resultwriter.writerow([f_count, coord[0], coord[1]])
+
+    def analyze_results(self):
+        """
+        Send the features over to analysis and switch tabs.
+        """
+        # Switch to the analysis tab
+        self.tabs.setCurrentWidget(self.analysis)
+
+        # Set the image
+        self.analysis.open_image([self.image_data])
+
+        # Open the data in analysis
+        self.analysis.open_data(self.results)

@@ -8,7 +8,6 @@ Created on Mon 6.27.22
 @usage: todo
 """
 
-from pydoc import Helper
 from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QTabWidget)
 from tracing.widgets import TracingWidget
 from helper.widgets import HelperWidget
@@ -38,12 +37,20 @@ class FeatureTracing(QApplication):
             tabs = QTabWidget()
             tabs.setDocumentMode(True)
 
+            # Instantiate widgets
+            analysis = AnalysisWidget()
+            tracing = TracingWidget()
+            helper = HelperWidget()
+
+            # Set the analysis and tab widgets
+            tracing.autoTab.occult.set_at(analysis, tabs)
+
             # Add new widgets for each page
             # tabs.addTab(label,"Preprocessing")
-            tabs.addTab(TracingWidget(),"Tracing")
-            tabs.addTab(AnalysisWidget(),"Analysis")
+            tabs.addTab(tracing,"Tracing")
+            tabs.addTab(analysis,"Analysis")
             # tabs.addTab(label1,"Time Series")
-            tabs.addTab(HelperWidget(),"Helper functions")
+            tabs.addTab(helper,"Helper functions")
 
             self.setCentralWidget(tabs)
 

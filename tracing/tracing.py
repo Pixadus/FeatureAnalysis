@@ -76,7 +76,7 @@ class AutoTracingOCCULT:
             qthresh1, 
             qthresh2
             )
-        
+            
         return(features)
     
     def save(self, features, save_path):

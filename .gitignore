@@ -3,5 +3,4 @@ __pycache__
 */__pycache__
 
 # Ignore .sav image files
-data/images/sav
-data/images/*sav*/*.sav
+data/images/sav/
