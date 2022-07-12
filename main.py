@@ -9,9 +9,10 @@ Created on Mon 6.27.22
 """
 
 from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QTabWidget)
+from preprocessing.widgets import PreprocessWidget
 from tracing.widgets import TracingWidget
-from helper.widgets import HelperWidget
 from analysis.widgets import AnalysisWidget
+from helper.widgets import HelperWidget
 
 class FeatureTracing(QApplication):
     def __init__(self):
@@ -28,7 +29,7 @@ class FeatureTracing(QApplication):
             super().__init__()
 
             # Application setup and backend
-            self.version = 0.1
+            self.version = 0.5
             self.title = "Feature Tracing v{}".format(self.version)
             self.resize(850,600)
             self.setWindowTitle(self.title)
@@ -38,6 +39,7 @@ class FeatureTracing(QApplication):
             tabs.setDocumentMode(True)
 
             # Instantiate widgets
+            preprocessing = PreprocessWidget()
             analysis = AnalysisWidget()
             tracing = TracingWidget()
             helper = HelperWidget()
@@ -46,7 +48,7 @@ class FeatureTracing(QApplication):
             tracing.autoTab.occult.set_at(analysis, tabs)
 
             # Add new widgets for each page
-            # tabs.addTab(label,"Preprocessing")
+            tabs.addTab(preprocessing,"Preprocessing")
             tabs.addTab(tracing,"Tracing")
             tabs.addTab(analysis,"Analysis")
             # tabs.addTab(label1,"Time Series")

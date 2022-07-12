@@ -9,7 +9,7 @@ functions for the feature tracing program.
 """
 
 from PySide6.QtGui import QPalette
-from PySide6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QLineEdit, QGroupBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QLabel, QLineEdit, QGroupBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget)
 from scipy.io import readsav
 from skimage.transform import rotate
 from skimage.util import img_as_float64
@@ -236,6 +236,26 @@ class EditFITSWidget(QWidget):
         editLayout.addRow("Crop bottom:",self.cropBottom)
         editLayout.addRow("Crop left:",self.cropLeft)
 
+        # Add a edit summary section
+        summGroup = QGroupBox("Edit totals")
+        self.summLayout = QFormLayout()
+        summGroup.setLayout(self.summLayout)
+        sideLayout.addWidget(summGroup)
+
+        # Add edit summary totals
+        self.rotateTotal = 0.0
+        self.cropTopTotal = 0
+        self.cropRightTotal = 0
+        self.cropBottomTotal = 0
+        self.cropLeftTotal = 0
+
+        # Add totals to summary
+        self.summLayout.insertRow(0,"Rotation:", QLabel(str(self.rotateTotal)))
+        self.summLayout.insertRow(1,"Crop top:", QLabel(str(self.cropTopTotal)))
+        self.summLayout.insertRow(2,"Crop right:", QLabel(str(self.cropRightTotal)))
+        self.summLayout.insertRow(3,"Crop bottom:", QLabel(str(self.cropBottomTotal)))
+        self.summLayout.insertRow(4,"Crop left:", QLabel(str(self.cropLeftTotal)))
+
         # Add a horizontal layout to the buttons
         buttonLayout = QHBoxLayout()
         sideLayout.addLayout(buttonLayout)
@@ -263,18 +283,11 @@ class EditFITSWidget(QWidget):
         try:
             f = fits.open(image_path, ignore_missing_end=True)
             self.img_orig = f[0].data
-            self.img_alt = self.img_orig
         except:
             print("Error opening image.")
             return
         
-        self.ax.cla()
-        self.ax.imshow(self.img_orig, origin="lower")
-        # Refresh the canvas
-        self.ax.draw_artist(self.ax.patch)
-        self.canvas.update()
-        self.canvas.flush_events()
-        self.canvas.draw()
+        self.reset_changes()
     
     def set_image(self):
         """
@@ -287,7 +300,7 @@ class EditFITSWidget(QWidget):
         self.canvas.update()
         self.canvas.flush_events()
         self.canvas.draw()
-    
+
     def reset_changes(self):
         """
         Reset the image back to the original.
@@ -300,6 +313,23 @@ class EditFITSWidget(QWidget):
         self.canvas.flush_events()
         self.canvas.draw()
         self.img_alt = self.img_orig
+
+        # Reset summary text
+        self.rotateTotal = 0
+        self.summLayout.removeRow(0)
+        self.summLayout.insertRow(0, "Rotate:", QLabel(str(self.rotateTotal)))
+        self.cropTopTotal = 0
+        self.summLayout.removeRow(1)
+        self.summLayout.insertRow(1, "Crop top:", QLabel(str(self.cropTopTotal)))
+        self.cropRightTotal = 0
+        self.summLayout.removeRow(2)
+        self.summLayout.insertRow(2, "Crop right:", QLabel(str(self.cropRightTotal)))
+        self.cropBottomTotal = 0
+        self.summLayout.removeRow(3)
+        self.summLayout.insertRow(3, "Crop bottom:", QLabel(str(self.cropBottomTotal)))
+        self.cropLeftTotal = 0
+        self.summLayout.removeRow(4)
+        self.summLayout.insertRow(4, "Crop left:", QLabel(str(self.cropLeftTotal)))
     
     def apply_changes(self):
         """
@@ -320,6 +350,13 @@ class EditFITSWidget(QWidget):
             # Set the image
             self.set_image()
 
+            # Increment the counter
+            self.rotateTotal += int(self.rotateEdit.text())
+            
+            # Reset row
+            self.summLayout.removeRow(0)
+            self.summLayout.insertRow(0, "Rotate:", QLabel(str(self.rotateTotal)))
+
         if self.cropTop.text() != '':
             n = int(self.cropTop.text())
             # Size is of format (rows,cols)
@@ -334,6 +371,13 @@ class EditFITSWidget(QWidget):
 
             # Set the image
             self.set_image()
+
+            # Increment the counter
+            self.cropTopTotal += int(self.cropTop.text())
+            
+            # Reset row
+            self.summLayout.removeRow(1)
+            self.summLayout.insertRow(1, "Crop top:", QLabel(str(self.cropTopTotal)))
         
         if self.cropRight.text() != '':
             n = int(self.cropRight.text())
@@ -349,6 +393,14 @@ class EditFITSWidget(QWidget):
 
             # Set the image
             self.set_image()
+
+            # Increment the counter
+            self.cropRightTotal += int(self.cropRight.text())
+            
+            # Reset row
+            self.summLayout.removeRow(2)
+            self.summLayout.insertRow(2, "Crop right:", QLabel(str(self.cropRightTotal)))
+
         
         if self.cropBottom.text() != '':
             n = int(self.cropBottom.text())
@@ -362,6 +414,13 @@ class EditFITSWidget(QWidget):
 
             # Set the image
             self.set_image()
+
+            # Increment the counter
+            self.cropBottomTotal += int(self.cropBottom.text())
+            
+            # Reset row
+            self.summLayout.removeRow(3)
+            self.summLayout.insertRow(3, "Crop bottom:", QLabel(str(self.cropBottomTotal)))
 
         if self.cropLeft.text() != '':
             n = int(self.cropLeft.text())
@@ -377,3 +436,24 @@ class EditFITSWidget(QWidget):
 
             # Set the image
             self.set_image()
+
+            # Increment the counter
+            self.cropLeftTotal += int(self.cropLeft.text())
+            
+            # Reset row
+            self.summLayout.removeRow(4)
+            self.summLayout.insertRow(4, "Crop left:", QLabel(str(self.cropLeftTotal)))
+
+    def save_results(self):
+        """
+        Save the new data.
+        """
+        dialog = QFileDialog()
+        # We're saving a file, not opening here
+        dialog.setAcceptMode(QFileDialog.AcceptSave)
+        dialog.setFileMode(QFileDialog.AnyFile)
+        # Returned path is a tuple of (path, file_type)
+        save_path = dialog.getSaveFileName(self, "Save results", filter="CSV file (*.fits)")[0]
+        
+        hdu = fits.PrimaryHDU(self.img_alt)
+        hdu.writeto(save_path)
