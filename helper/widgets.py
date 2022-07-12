@@ -8,9 +8,15 @@ Created on Wed 6.29.22
 functions for the feature tracing program. 
 """
 
-from PySide6.QtWidgets import (QCheckBox, QFileDialog, QGroupBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtGui import QPalette
+from PySide6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QLineEdit, QGroupBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget)
 from scipy.io import readsav
+from skimage.transform import rotate
+from skimage.util import img_as_float64
 from astropy.io import fits
+from matplotlib import pyplot, colors
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+import numpy as np
 
 class HelperWidget(QWidget):
     def __init__(self):
@@ -32,22 +38,31 @@ class HelperWidget(QWidget):
 
         # Function buttons
         sfButton = QPushButton("Convert .sav to .fits")
-        sfButton.clicked.connect(self.toggle_sav_fits)
+        sfButton.clicked.connect(lambda: self.toggle_widget(self.sfw))
         hfLayout.addWidget(sfButton)
 
-        # Save -> FITS Widget
-        self.sfw = SFWidget()
-        layout.addWidget(self.sfw)
+        efButton = QPushButton("Edit .FITS file")
+        efButton.clicked.connect(lambda: self.toggle_widget(self.efw))
+        hfLayout.addWidget(efButton)
 
-    def toggle_sav_fits(self):
+        # Add the helper widgets
+        self.sfw = SFWidget()
+        self.efw = EditFITSWidget()
+        layout.addWidget(self.sfw)
+        layout.addWidget(self.efw)
+
+        # Hide helper widgets initially
+        self.efw.setVisible(False)
+        self.sfw.setVisible(False)
+
+    def toggle_widget(self, widget):
         """
-        Function to toggle the IDL .sav -> .fits
-        format widget.
+        Function to toggle widget to be visble.
         """
-        if self.sfw.isVisible():
-            self.sfw.setVisible(False)
+        if widget.isVisible():
+            widget.setVisible(False)
         else:
-            self.sfw.setVisible(True)
+            widget.setVisible(True)
 
 class SFWidget(QWidget):
     def __init__(self):
@@ -156,3 +171,209 @@ class SFWidget(QWidget):
                 hdu = fits.PrimaryHDU(data)
                 path = save_path+"/"+selectedText+".fits"
                 hdu.writeto(path)
+
+class EditFITSWidget(QWidget):
+    def __init__(self):
+        """
+        Container widget for editing .fits files.
+        """
+        super().__init__()
+
+        # Layout for the widget
+        layout = QHBoxLayout(self)
+
+        # Add matplotlib canvas to layout
+        self.figure = pyplot.figure()
+        self.ax = self.figure.add_axes([0,0,1,1])
+        self.canvas = FigureCanvasQTAgg(self.figure)
+        layout.addWidget(self.canvas)
+
+        # Set the background color of the canvas
+        win_color = self.palette().color(QPalette.Window).getRgbF()
+        plot_color = colors.rgb2hex(win_color)
+        self.figure.set_facecolor(plot_color)
+
+        # Hide the axes
+        self.ax.get_xaxis().set_visible(False)
+        self.ax.get_yaxis().set_visible(False)
+
+        # Add a vertical bar to the right
+        sideLayout = QVBoxLayout()
+        layout.addLayout(sideLayout)
+
+        # Open image button 
+        imageButton = QPushButton("Open image")
+        imageButton.clicked.connect(self.open_image)
+        sideLayout.addWidget(imageButton)
+
+        # Group of image edit buttons
+        editGroup = QGroupBox("Edit functions")
+        editLayout = QFormLayout()
+        editGroup.setLayout(editLayout)
+        sideLayout.addWidget(editGroup)
+        
+        # Add editing functions
+        self.rotateEdit = QLineEdit()
+        self.cropTop = QLineEdit()
+        self.cropRight = QLineEdit()
+        self.cropBottom = QLineEdit()
+        self.cropLeft = QLineEdit()
+
+        # Set width of bar
+        self.rotateEdit.setMinimumWidth(65)
+
+        # Set placeholder text
+        self.rotateEdit.setPlaceholderText("0.0 deg")
+        self.cropTop.setPlaceholderText("0 px")
+        self.cropRight.setPlaceholderText("0 px")
+        self.cropBottom.setPlaceholderText("0 px")
+        self.cropLeft.setPlaceholderText("0 px")
+
+        # Add the widgets to the layout
+        editLayout.addRow("Rotate:",self.rotateEdit)
+        editLayout.addRow("Crop top:",self.cropTop)
+        editLayout.addRow("Crop right:",self.cropRight)
+        editLayout.addRow("Crop bottom:",self.cropBottom)
+        editLayout.addRow("Crop left:",self.cropLeft)
+
+        # Add a horizontal layout to the buttons
+        buttonLayout = QHBoxLayout()
+        sideLayout.addLayout(buttonLayout)
+
+        # Add an apply changes button
+        applyButton = QPushButton("Apply")
+        applyButton.clicked.connect(self.apply_changes)
+        buttonLayout.addWidget(applyButton)
+
+        # Add an image reset button
+        resetButton = QPushButton("Reset")
+        resetButton.clicked.connect(self.reset_changes)
+        buttonLayout.addWidget(resetButton)
+
+    def open_image(self):
+        """
+        Open a file browser and select an image.
+        """
+        dialog = QFileDialog()
+        # Only allow single, existing files
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        # Image is a tuple of (path, file_type)
+        image_path = dialog.getOpenFileName(self, "Open image", filter="FITS file (*.fits)")[0]
+        # Try to open data and set graph image
+        try:
+            f = fits.open(image_path, ignore_missing_end=True)
+            self.img_orig = f[0].data
+            self.img_alt = self.img_orig
+        except:
+            print("Error opening image.")
+            return
+        
+        self.ax.cla()
+        self.ax.imshow(self.img_orig, origin="lower")
+        # Refresh the canvas
+        self.ax.draw_artist(self.ax.patch)
+        self.canvas.update()
+        self.canvas.flush_events()
+        self.canvas.draw()
+    
+    def set_image(self):
+        """
+        Set the axes image and refresh.
+        """
+        self.ax.cla()
+        self.ax.imshow(self.img_alt, origin="lower")
+        # Refresh the canvas
+        self.ax.draw_artist(self.ax.patch)
+        self.canvas.update()
+        self.canvas.flush_events()
+        self.canvas.draw()
+    
+    def reset_changes(self):
+        """
+        Reset the image back to the original.
+        """
+        self.ax.cla()
+        self.ax.imshow(self.img_orig, origin="lower")
+        # Refresh the canvas
+        self.ax.draw_artist(self.ax.patch)
+        self.canvas.update()
+        self.canvas.flush_events()
+        self.canvas.draw()
+        self.img_alt = self.img_orig
+    
+    def apply_changes(self):
+        """
+        Apply supplied changes to the image.
+        """
+        # Get all the parameters from the params box
+        if self.rotateEdit.text() != '':
+            self.img_alt = rotate(
+                img_as_float64(self.img_alt), 
+                float(self.rotateEdit.text()),
+                resize=False
+                )
+
+            self.img_alt = self.img_alt[~np.all(self.img_alt == 0, axis=1)]
+            bad_cols = np.argwhere(np.all(self.img_alt[..., :] == 0, axis=0))
+            self.img_alt = np.delete(self.img_alt, bad_cols, axis=1)
+
+            # Set the image
+            self.set_image()
+
+        if self.cropTop.text() != '':
+            n = int(self.cropTop.text())
+            # Size is of format (rows,cols)
+            img_size = self.img_alt.shape
+
+            # Remove the first n rows
+            self.img_alt = np.delete(
+                self.img_alt,
+                np.s_[img_size[0]-n:img_size[0]],
+                axis=0
+            )
+
+            # Set the image
+            self.set_image()
+        
+        if self.cropRight.text() != '':
+            n = int(self.cropRight.text())
+            # Size is of format (rows, cols)
+            img_size = self.img_alt.shape
+
+            # Remove last n cols
+            self.img_alt = np.delete(
+                self.img_alt,
+                np.s_[img_size[1]-n:img_size[1]],
+                axis=1
+            )
+
+            # Set the image
+            self.set_image()
+        
+        if self.cropBottom.text() != '':
+            n = int(self.cropBottom.text())
+
+            # Remove the last n rows
+            self.img_alt = np.delete(
+                self.img_alt,
+                np.s_[0:n],
+                axis=0
+            )
+
+            # Set the image
+            self.set_image()
+
+        if self.cropLeft.text() != '':
+            n = int(self.cropLeft.text())
+            # Size is of format (rows, cols)
+            img_size = self.img_alt.shape
+
+            # Remove first n cols
+            self.img_alt = np.delete(
+                self.img_alt,
+                np.s_[0:n],
+                axis=1
+            )
+
+            # Set the image
+            self.set_image()
