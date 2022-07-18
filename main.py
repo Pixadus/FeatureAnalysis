@@ -45,7 +45,8 @@ class FeatureTracing(QApplication):
             helper = HelperWidget()
 
             # Set the analysis and tab widgets
-            tracing.autoTab.occult.set_at(analysis, tabs)
+            for opt in tracing.autoTab.options.keys():
+                tracing.autoTab.options[opt].set_at(analysis, tabs)
 
             # Add new widgets for each page
             tabs.addTab(preprocessing,"Preprocessing")

@@ -1,3 +1,6 @@
 [submodule "RHT"]
 	path = RHT
 	url = https://github.com/seclark/RHT
+[submodule "tracing/RHT"]
+	path = tracing/RHT
+	url = https://github.com/seclark/RHT

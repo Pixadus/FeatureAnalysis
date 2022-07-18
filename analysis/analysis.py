@@ -8,7 +8,7 @@ Created on Tue 7.5.22
 both breadth and length, as well as optionally supplied features.
 """
 
-from decimal import ROUND_DOWN
+from preprocessing import processing
 import numpy as np
 import cv2
 
@@ -98,25 +98,12 @@ class Analysis:
         """
         Get the feature breadth on a per-coordinate basis.
         """
-        def unsharp_mask(image, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0):
-            """Return a sharpened version of the image, using an unsharp mask."""
-            # From https://codingdeekshi.com/python-3-opencv-script-to-smoothen-or-sharpen-input-image-using-numpy-library/
-            blurred = cv2.GaussianBlur(image, kernel_size, sigma)
-            sharpened = float(amount + 1) * image - float(amount) * blurred
-            sharpened = np.maximum(sharpened, np.zeros(sharpened.shape))
-            sharpened = np.minimum(sharpened, 255 * np.ones(sharpened.shape))
-            sharpened = sharpened.round().astype(np.uint8)
-            if threshold > 0:
-                low_contrast_mask = np.absolute(image - blurred) < threshold
-                np.copyto(sharpened, image, where=low_contrast_mask)
-            return sharpened
-        
         # Convert to a format that CV2 can easily recognize
         img_data = self.img_data*325
         img_data = img_data.astype(np.uint8)
         
         # Create a sharpened image, then blur it a bit to get rid of noise
-        id_sharp = unsharp_mask(img_data, amount=10.0)
+        id_sharp = processing.unsharp_mask(img_data, amount=10.0)
         id_sharp_gauss = cv2.GaussianBlur(id_sharp, (5,5), 8.0)
 
         # Get edges in the image
@@ -128,7 +115,6 @@ class Analysis:
             wctr = 0
             # Get a list of all coordinates in feature
             coords = [c['coord'] for c in self.f_data[feature_num]]
-            # TODO this is inefficient
             for dict_coord, coord in zip(self.f_data[feature_num], coords):
                 # Increment the width counter
                 wctr +=1
