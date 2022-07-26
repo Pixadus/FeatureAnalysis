@@ -166,14 +166,22 @@ class Analysis:
                         coord_offset[1] = coord_offset[1]-dp[1]
                 except IndexError:
                     pass
-                if (wctr % 5) == 0:
+                if wctr % 5 ==0:
                     self.ax.plot(ys,xs,markersize=1,linewidth=1, color='#a09516', alpha=0.7)
                 # Add width to coord characteristics
-                coord = np.append(coord,np.array([bp+bn]))
                 dict_coord['breadth'] = bp+bn
-                # TODO compare with previous coordinate width. If significantly larger, (i.e. 4 -> 12), set to previous
-                # coordinate width, as it's implied there is a error width here. 
-    
+            # Filter through the coordinates and reject breadth outliers
+            widths_filtered = np.array([dict_coord['breadth'] for dict_coord in self.f_data[feature_num]])
+            # Using an m value of 3.5 to filter out outliers
+            # from https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm
+            # and https://stackoverflow.com/questions/11686720/is-there-a-numpy-builtin-to-reject-outliers-from-a-list
+            d = np.abs(widths_filtered - np.median(widths_filtered))
+            mdev = np.median(d)
+            s = d/mdev if mdev else 0.
+            widths_filtered = widths_filtered[s<3.5]
+            for dict_coord in self.f_data[feature_num]:
+                dict_coord = {key:val for key, val in dict_coord.items() if val in widths_filtered}
+
     def get_length(self):
         """
         Calculate the length of all individual

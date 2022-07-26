@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (QColorDialog, QComboBox, QFileDialog,
 from astropy.io import fits
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib import (pyplot, colors)
-from tracing.tracing import (AutoTracingOCCULT, AutoTracingRHT)
+from tracing.tracing import (AutoTracingOCCULT)
 import csv
 
 class TracingWidget(QWidget):
@@ -158,8 +158,7 @@ class AutoTab(QWidget):
         layout = QVBoxLayout(self)
 
         self.options = {
-            "OCCULT-2" : OCCULTParams(),
-            "RHT" : RHTParams()
+            "OCCULT-2" : OCCULTParams()
             }
 
         # Menu to select tracing type
@@ -346,7 +345,7 @@ class OCCULTParams(QWidget):
             for coord in result:
                 x.append(coord[0])
                 y.append(coord[1])
-            self.ax.plot(x,y, color=self.pcolor)
+            self.ax.plot(x,y, color=self.pcolor, linewidth=0.5)
 
         # Refresh the canvas
         self.ax.draw_artist(self.ax.patch)
@@ -357,198 +356,6 @@ class OCCULTParams(QWidget):
         # Enable the save & color buttons
         self.saveButton.setEnabled(True)
         self.analyzeButton.setEnabled(True)
-
-    def save_results(self):
-        """
-        Save the feature trace results.
-        """
-        dialog = QFileDialog()
-        # We're saving a file, not opening here
-        dialog.setAcceptMode(QFileDialog.AcceptSave)
-        dialog.setFileMode(QFileDialog.AnyFile)
-        # Returned path is a tuple of (path, file_type)
-        save_path = dialog.getSaveFileName(self, "Save results", filter="CSV file (*.csv)")[0]
-        
-        # Save format will be { feature_id, x, y }
-        f_count = 0
-        with open(save_path, 'w') as outfile:
-            resultwriter = csv.writer(outfile)
-            for result in self.results:
-                f_count+=1
-                for coord in result:
-                        # TODO verify this is x,y and not y,x
-                        resultwriter.writerow([f_count, coord[0], coord[1]])
-
-    def analyze_results(self):
-        """
-        Send the features over to analysis and switch tabs.
-        """
-        # Switch to the analysis tab
-        self.tabs.setCurrentWidget(self.analysis)
-
-        # Set the image
-        self.analysis.open_image([self.image_data])
-
-        # Open the data in analysis
-        self.analysis.open_data(self.results)
-
-class RHTParams(QWidget):
-    def __init__(self):
-        """
-        Parameters & buttons used when RHT is selected.
-        """
-        super().__init__()
-
-        # Initial variable values
-        self.image_path = None
-        self.canvas = None
-        self.ax = None
-        self.results = None
-        self.pcolor = (0,0,1,1)
-
-        # Layout for the section
-        layout = QVBoxLayout(self)
-
-        # Parameters setup
-        params = QGroupBox()
-        paramsLayout = QFormLayout()
-        paramsLayout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
-        params.setTitle("Parameters")
-        params.setLayout(paramsLayout)
-
-        # Parameters
-        self.wlen = QLineEdit()
-        self.wlen.setMinimumWidth(40)
-        self.wlen.setPlaceholderText("55")
-        self.smr = QLineEdit()
-        self.smr.setPlaceholderText("12")
-        self.frac = QLineEdit()
-        self.frac.setPlaceholderText("0.70")
-
-        # Set rows for parameter box
-        paramsLayout.addRow(QLabel("Min. feature length:"), self.wlen)
-        paramsLayout.addRow(QLabel("Smoothing radius:"), self.smr)
-        paramsLayout.addRow(QLabel("Intensity threshold:"), self.frac)
-
-        # Add parameters box to global box
-        layout.addWidget(params)
-
-        # Add horizontal button group
-        buttonLayout = QHBoxLayout()
-
-        # Add button to save, trace and analyze the data
-        self.traceButton = QPushButton("Trace")
-        self.saveButton = QPushButton("Save")
-        self.analyzeButton = QPushButton("Analyze")
-
-        # Disable buttons until enabled by functions
-        self.traceButton.setEnabled(False)
-        self.saveButton.setEnabled(False)
-        self.analyzeButton.setEnabled(False)
-
-        # Button configuration
-        self.traceButton.clicked.connect(self.run_rht)
-        self.saveButton.clicked.connect(self.save_results)
-        self.analyzeButton.clicked.connect(self.analyze_results)
-        
-        # Add buttons to layout
-        layout.addWidget(self.traceButton)
-        buttonLayout.addWidget(self.analyzeButton)
-        buttonLayout.addWidget(self.saveButton)
-
-        # Add sub-layout to params layout
-        layout.addLayout(buttonLayout)
-
-    def update_buttons(self, image_path, image_data):
-        """
-        Enable some elements if the image path becomes valid.
-        """
-        if image_path == None:
-            self.traceButton.setEnabled(False)
-        else:
-            self.traceButton.setEnabled(True)
-
-        self.image_path = image_path
-        self.image_data = image_data
-
-    def set_mpl(self, canvas, ax):
-        """
-        Update the local canvas & axes
-
-        Parameters
-        ----------
-        canvas : FigureCanvasQTAgg
-            This function is only meant to be run internally
-        ax : Figure.Axes
-            This function is only meant to be run internally
-        """
-        self.canvas = canvas
-        self.ax = ax
-    
-    def set_at(self, analysis, tabs):
-        """
-        Set the analysis and tab widgets from main.py.
-
-        Parameters
-        ----------
-        analysis : AnalysisWidget
-            Necessary to set plot data on the analysis tab.
-        tabs : QTabWidget
-            Necessary to swap tabs.
-        """
-        self.analysis = analysis
-        self.tabs = tabs
-
-    def run_rht(self):
-        """
-        Run RHT using paramers attached to self.
-        """
-        params = [self.wlen, self.smr, self.frac]
-
-        # Set the placeholder text to the actual text if run without an entry
-        for param in params:
-            if len(param.text()) == 0:
-                param.setText(param.placeholderText())
-
-        # Create an AutoTracingRHT instance
-        at = AutoTracingRHT(self.image_path)
-
-        # Run RHT
-        self.results = at.run(
-            int(params[0].displayText()),
-            int(params[1].displayText()),
-            float(params[2].displayText())
-        )
-
-        # # Clear the current axes from previous results
-        self.ax.cla()
-
-        # # Reset the image, since it's cleared with cla()
-        self.ax.imshow(self.results, origin="lower")
-
-        self.ax.draw_artist(self.ax.patch)
-        self.canvas.update()
-        self.canvas.flush_events()
-        self.canvas.draw()
-
-        # # Plot the results
-        # for result in self.results:
-        #     x = []
-        #     y = []
-        #     for coord in result:
-        #         x.append(coord[0])
-        #         y.append(coord[1])
-        #     self.ax.plot(x,y, color=self.pcolor)
-
-        # # Refresh the canvas
-        # self.ax.draw_artist(self.ax.patch)
-        # self.canvas.update()
-        # self.canvas.flush_events()
-        # self.canvas.draw()
-
-        # # Enable the save & color buttons
-        # self.saveButton.setEnabled(True)
-        # self.analyzeButton.setEnabled(True)
 
     def save_results(self):
         """

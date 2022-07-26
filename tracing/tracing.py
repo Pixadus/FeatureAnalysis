@@ -12,7 +12,6 @@ import csv
 import os
 import sunkit_image.trace
 from astropy.io import fits
-from tracing.rht import rht
 from PySide6.QtGui import (QAction, QIcon)
 from PySide6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QToolBar)
 
@@ -98,50 +97,6 @@ class AutoTracingOCCULT:
                 fibril_num += 1
                 for coord in fibril:
                     savewriter.writerow([fibril_num, coord[0], coord[1]])
-
-class AutoTracingRHT:
-    def __init__(self, image_path):
-        """
-        Autotracing class which acts as a wrapper for S.E. Clark's
-        Rolling Hough Transform implementation, available at
-        https://github.com/seclark/RHT. 
-
-        Each AutoTracing instance should act on a single image. 
-
-        Parameters
-        ----------
-        image_path : str
-            Path to the image containing features to trace. Image must be in .fits format.
-        """
-        # Set the image_path
-        self.image_path = image_path
-
-    def run(self, wlen=55, smr=12, frac=0.7):
-        """
-        Run the RHT on the image data, then retrieve the coordinates of identified
-        features. 
-
-        Parameters
-        ----------
-        wlen : int
-            Minimum spatial length for identified features,
-            in pixels.
-        smr : int
-            Gaussian smoothing radius in pixels.
-        frac : float
-            Threshold value from 0.0 to 1.0, which acts
-            as a threshold intensity above which a pixel 
-            is part of a feature.
-
-        Returns
-        -------
-        features : list
-            List of features, each feature is a list containing
-            coordinates. 
-        """
-        # Results: [xpoints, ypoints, thetas, backprojection, wlen, smr, thresh]
-        results = rht.rht(self.image_path, wlen=wlen, smr=smr, frac=frac)
-        return(results[-1])
     
 class ManualTrace:
     def __init__(self, image_path=""):

@@ -57,7 +57,8 @@ class PreprocessWidget(QWidget):
         # Processing options
         self.options = {
             "Gaussian smoothing" : self.GSParams(),
-            "Sharpening" : self.SharpParams()
+            "Sharpening" : self.SharpParams(),
+            "Rolling hough transform" : self.RHTParams()
             }
 
         # Add a processing algorithm selector
@@ -158,7 +159,8 @@ class PreprocessWidget(QWidget):
         # Create a dictionary of functions
         opt_fn = {
             "Gaussian smoothing" : processing.gaussian_smoothing,
-            "Sharpening" : processing.sharpen
+            "Sharpening" : processing.sharpen,
+            "Rolling hough transform" : processing.rolling_hough_transform
         }
         params = self.options[self.currentOpt].get_params()
 
@@ -305,4 +307,46 @@ class PreprocessWidget(QWidget):
                 sigma,
                 amount,
                 thresh
+                ])
+
+    class RHTParams(QWidget):
+        def __init__(self):
+            """
+            Rolling Hough Transform parameters.
+            """
+            super().__init__()
+
+            # Set layout
+            layout = QFormLayout(self)
+
+            # Create params
+            self.wlenEdit = QLineEdit()
+            self.wlenEdit.setPlaceholderText("55")
+            self.wlenEdit.setToolTip("Must be an odd number.")
+            self.smrEdit = QLineEdit()
+            self.smrEdit.setPlaceholderText("4")
+            self.fracEdit = QLineEdit()
+            self.fracEdit.setPlaceholderText("0.7")
+            
+            # Add params to layout
+            layout.insertRow(0, "Min. length:", self.wlenEdit)
+            layout.insertRow(1, "Smoothing radius:", self.smrEdit)
+            layout.insertRow(2, "Int. threshold:", self.fracEdit)
+
+        def get_params(self):
+            """
+            Return the parameters of the box.
+
+            Returns
+            -------
+            params : list
+            """
+            wlen = int(self.wlenEdit.text())
+            smr = int(self.smrEdit.text())
+            frac = float(self.fracEdit.text())
+
+            return([
+                wlen,
+                smr,
+                frac
                 ])

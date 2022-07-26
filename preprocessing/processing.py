@@ -9,6 +9,7 @@ images.
 """
 
 from scipy.ndimage import gaussian_filter
+from preprocessing.rht import rht
 import cv2
 import numpy as np
 
@@ -25,6 +26,11 @@ def gaussian_smoothing(img_data, params):
         mode : str
             Determines how the input array is extended when the filter 
             overlaps a border.
+
+    Returns
+    -------
+    data : ndarray
+        Gaussian-smoothed image.
     """
     sigma = float(params[0])
     mode = str(params[1])
@@ -36,6 +42,40 @@ def gaussian_smoothing(img_data, params):
         )
 
     return(gs)
+
+def rolling_hough_transform(img_data, params):
+    """
+    Perform a Rolling Hough Transform on the image data.
+
+    Parameters
+    ----------
+    img_data : ndarray
+    params : list 
+        wlen : int
+            Minimum spatial length for identified features,
+            in pixels.
+        smr : int
+            Gaussian smoothing radius in pixels.
+        frac : float
+            Threshold value from 0.0 to 1.0, which acts
+            as a threshold intensity above which a pixel 
+            is part of a feature.
+    
+    Returns
+    -------
+    data : ndarray
+        Image. 
+    """
+    rht_img = rht.rht(
+        '',
+        data=img_data, 
+        wlen=params[0], 
+        smr=params[1], 
+        frac=params[2]
+        )[-1]
+
+    return(rht_img)
+    
 
 def unsharp_mask(image, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0):
     """Return a sharpened version of the image, using an unsharp mask."""
