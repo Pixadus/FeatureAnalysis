@@ -8,15 +8,18 @@ Created on Tue 6.28.22
 curvilinear features.
 """
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (QColorDialog, QComboBox, QFileDialog, 
                             QFormLayout, QGroupBox, QHBoxLayout, 
                             QLabel, QLineEdit, QPushButton,
                             QTabWidget, QVBoxLayout, QWidget)
 from astropy.io import fits
+import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib import (pyplot, colors)
 from tracing.tracing import (AutoTracingOCCULT)
+from collections import OrderedDict
 import csv
 
 class TracingWidget(QWidget):
@@ -29,6 +32,9 @@ class TracingWidget(QWidget):
 
         # Layout for the whole tab window
         layout = QHBoxLayout(self)
+
+        # Set the focus policy
+        self.setFocusPolicy(Qt.ClickFocus)
         
         # Add matplotlib canvas to layout
         self.figure = pyplot.figure()
@@ -83,10 +89,14 @@ class TracingWidget(QWidget):
         # Add "Automatic" and "Manual" tabs
         tabs = QTabWidget()
         self.autoTab = AutoTab()
+        self.manTab = ManualTab()
+        self.canvas.mpl_connect('button_press_event', self.manTab.process_click)
+        self.manTab.set_mpl(self.canvas, self.ax)
         for pset in self.autoTab.options.keys():
             self.autoTab.options[pset].set_mpl(self.canvas, self.ax)
         tabs.setDocumentMode(True)
         tabs.addTab(self.autoTab, "Automatic")
+        tabs.addTab(self.manTab, "Manual")
         controlLayout.addWidget(tabs)
 
         layout.addLayout(controlLayout)
@@ -148,6 +158,15 @@ class TracingWidget(QWidget):
         self.canvas.flush_events()
         self.canvas.draw()
 
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.manTab.deselect_line()
+            self.manTab.redraw_canvas()
+        if event.key() == Qt.Key_Delete or event.key() == Qt.Key_Backspace:
+            self.manTab.delete_line()
+            self.manTab.redraw_canvas()
+        return
+
 class AutoTab(QWidget):
     def __init__(self):
         """
@@ -187,6 +206,161 @@ class AutoTab(QWidget):
         
         # Set the seleted parameter set to visible
         self.options[self.menu.currentText()].setVisible(True)
+
+class ManualTab(QWidget):
+    def __init__(self):
+        """
+        Widget which contains manual tracing functions
+        """
+        super().__init__()
+
+        # Global layout
+        layout = QVBoxLayout(self)
+
+        # Variable initiation
+        self.selected_line = None
+        self.f_data = OrderedDict()
+
+        # Button to open previous or automatic data
+        openButton = QPushButton("Open data (optional)")
+        openButton.clicked.connect(self.open_data)
+        layout.addWidget(openButton)
+        
+        # Image controls box
+        controlBox = QGroupBox("Controls")
+        controlLayout = QHBoxLayout()
+        controlBox.setLayout(controlLayout)
+        layout.addWidget(controlBox)
+
+        # Add buttons to controls box
+        self.bezierButton = QPushButton("Bezier")
+        self.lineButton = QPushButton("Line")
+        self.bezierButton.setCheckable(True)
+        self.lineButton.setCheckable(True)
+        controlLayout.addWidget(self.bezierButton)
+        controlLayout.addWidget(self.lineButton)
+
+        # Add save button to layout
+        self.saveButton = QPushButton("Save data")
+        self.saveButton.setEnabled(False)
+        layout.addWidget(self.saveButton)
+    
+    def process_click(self, event):
+        """
+        Process a click on the matplotlib canvas.
+
+        If none of the control buttons are selected, assume
+        click is used to select a feature line. Enter/esc
+        key deselects feature.
+
+        If either Bezier or Line is selected, trace line until
+        enter/esc key is pressed. Highlight active line in different
+        color.
+        """
+        ix, iy = event.xdata, event.ydata
+        if self.bezierButton.isChecked():
+            # Draw a Bezier curve
+            print("Bezier is checked")
+        elif self.lineButton.isChecked():
+            # Draw a multi-point line
+            print("Line is checked")
+        else:
+            # Select line
+            closest_distance = 10000
+            closest_line = None
+            # Reset previously selected line, if any
+            self.deselect_line()
+            if self.selected_line:
+                self.selected_line.set_color("blue")
+                self.selected_line.set_linewidth(1)
+            for line in self.ax.get_lines():
+                xdata = line.get_xdata()
+                ydata = line.get_ydata()
+                d = np.sqrt(
+                    (xdata - ix)**2 + (ydata - iy)**2)
+                if len(d[d <= closest_distance]):
+                    closest_distance = np.sort(d[d<=closest_distance])[0]
+                    closest_line = line
+            if closest_line:
+                closest_line.set_color((1,0,0))
+                closest_line.set_linewidth(2)
+                self.selected_line = closest_line
+            self.redraw_canvas()
+            
+    def deselect_line(self):
+        """
+        Unselect a selected line, if any.
+        """
+        if self.selected_line:
+            self.selected_line.set_color("blue")
+            self.selected_line.set_linewidth(1)
+    
+    def delete_line(self):
+        """
+        Delete a selected line, if any. 
+        """
+        if self.selected_line:
+            self.selected_line.remove()
+
+    def redraw_canvas(self):
+        """
+        Refresh the canvas
+        """
+        self.ax.draw_artist(self.ax.patch)
+        self.canvas.update()
+        self.canvas.flush_events()
+        self.canvas.draw()
+
+    def open_data(self):
+        """
+        Load in automatic or previous manual data into the graph.
+        """
+        dialog = QFileDialog()
+        # Only allow single, existing files
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        # Image is a tuple of (path, file_type)
+        data_path = dialog.getOpenFileName(self, "Open CSV", filter="CSV file (*.csv)")[0]
+        if len(data_path) == 0:
+            return
+
+        # Try to open data and set graph data
+        with open(data_path) as datafile:
+            data = csv.reader(datafile)
+            f_num = 0
+            self.f_data[f_num] = []
+            for row in data:
+                # If a coordinate in the same feature
+                if int(row[0]) == f_num:
+                    coord = {"coord" : (float(row[1]), float(row[2]))}
+                    self.f_data[f_num].append(coord)
+                # If a new feature
+                else:
+                    x = [c["coord"][0] for c in self.f_data[f_num]]
+                    y = [c["coord"][1] for c in self.f_data[f_num]]
+                    self.ax.plot(x,y, color="blue", linewidth=1, markersize=1)
+                    # Set the new feature number
+                    f_num = int(row[0])
+                    coord = {"coord" : (float(row[1]), float(row[2]))}
+                    # Initialize the coordinate list, add current coord
+                    self.f_data[f_num] = [coord]
+        
+        # Redraw everything
+        self.redraw_canvas()
+        self.saveButton.setEnabled(True)
+
+    def set_mpl(self, canvas, ax):
+        """
+        Update the local canvas & axes
+
+        Parameters
+        ----------
+        canvas : FigureCanvasQTAgg
+            This function is only meant to be run internally
+        ax : Figure.Axes
+            This function is only meant to be run internally
+        """
+        self.canvas = canvas
+        self.ax = ax
 
 class OCCULTParams(QWidget):
     def __init__(self):
