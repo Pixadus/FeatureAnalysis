@@ -159,8 +159,9 @@ class TracingWidget(QWidget):
         self.canvas.draw()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
+        if event.key() == Qt.Key_Escape or event.key() == Qt.Key_Enter:
             self.manTab.deselect_line()
+            self.manTab.empty_drawcache()
             self.manTab.redraw_canvas()
         if event.key() == Qt.Key_Delete or event.key() == Qt.Key_Backspace:
             self.manTab.delete_line()
@@ -219,6 +220,7 @@ class ManualTab(QWidget):
 
         # Variable initiation
         self.selected_line = None
+        self.drawcache = []
         self.f_data = OrderedDict()
 
         # Button to open previous or automatic data
@@ -264,7 +266,18 @@ class ManualTab(QWidget):
             print("Bezier is checked")
         elif self.lineButton.isChecked():
             # Draw a multi-point line
-            print("Line is checked")
+            if self.selected_line:
+                # Add point to line if Some
+                self.drawcache.append((ix,iy))
+                x = np.array([coord[0] for coord in self.drawcache])
+                y = np.array([coord[1] for coord in self.drawcache])
+                self.selected_line.set_data(x,y)
+                self.redraw_canvas(full=False)
+            else:
+                # Initialize the line if None
+                self.selected_line, = self.ax.plot(ix,iy, color="red", linewidth=2)
+                self.drawcache.append((ix,iy))
+                self.redraw_canvas(full=False)
         else:
             # Select line
             closest_distance = 10000
@@ -286,7 +299,7 @@ class ManualTab(QWidget):
                 closest_line.set_color((1,0,0))
                 closest_line.set_linewidth(2)
                 self.selected_line = closest_line
-            self.redraw_canvas()
+            self.redraw_canvas(full=False)
             
     def deselect_line(self):
         """
@@ -295,6 +308,7 @@ class ManualTab(QWidget):
         if self.selected_line:
             self.selected_line.set_color("blue")
             self.selected_line.set_linewidth(1)
+            self.selected_line = None
     
     def delete_line(self):
         """
@@ -302,15 +316,24 @@ class ManualTab(QWidget):
         """
         if self.selected_line:
             self.selected_line.remove()
+    
+    def empty_drawcache(self):
+        """
+        Empty the point cache.
+        """
+        self.drawcache = []
 
-    def redraw_canvas(self):
+    def redraw_canvas(self, full=True):
         """
         Refresh the canvas
         """
-        self.ax.draw_artist(self.ax.patch)
-        self.canvas.update()
-        self.canvas.flush_events()
-        self.canvas.draw()
+        if full:
+            self.ax.draw_artist(self.ax.patch)
+            self.canvas.update()
+            self.canvas.flush_events()
+            self.canvas.draw()
+        else:
+            self.canvas.draw()
 
     def open_data(self):
         """
