@@ -22,6 +22,12 @@ from tracing.tracing import (AutoTracingOCCULT)
 from collections import OrderedDict
 import csv
 
+# Global variables
+LINEWIDTH = 0.5
+LINECOLOR = (0,0,1,0.7) # RGBA
+SEL_LINEWIDTH = 0.5
+SEL_LINECOLOR = (1,0,0,0.7)
+
 class TracingWidget(QWidget):
     def __init__(self):
         """
@@ -98,7 +104,6 @@ class TracingWidget(QWidget):
         tabs.addTab(self.autoTab, "Automatic")
         tabs.addTab(self.manTab, "Manual")
         controlLayout.addWidget(tabs)
-
         layout.addLayout(controlLayout)
     
     def open_image(self):
@@ -152,6 +157,12 @@ class TracingWidget(QWidget):
         for line in self.ax.get_lines():
             line.set_color(self.pcolor)
 
+        # Set colors for new lines in each class
+        self.autoTab.linecolor = self.pcolor
+        for opt in self.autoTab.options.keys():
+            self.autoTab.options[opt].linecolor = self.pcolor
+        self.manTab.linecolor = self.pcolor
+
         # Redraw everything
         self.ax.draw_artist(self.ax.patch)
         self.canvas.update()
@@ -159,13 +170,17 @@ class TracingWidget(QWidget):
         self.canvas.draw()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape or event.key() == Qt.Key_Enter:
+        """
+        Redefine the keyPressEvent for the tracing widget.
+        """
+        if event.key() == Qt.Key_Escape or event.key() == Qt.Key_Enter or event.key() == Qt.Key_Return:
             self.manTab.deselect_line()
             self.manTab.empty_drawcache()
             self.manTab.redraw_canvas()
         if event.key() == Qt.Key_Delete or event.key() == Qt.Key_Backspace:
             self.manTab.delete_line()
             self.manTab.redraw_canvas()
+            self.manTab.deselect_line()
         return
 
 class AutoTab(QWidget):
@@ -177,6 +192,13 @@ class AutoTab(QWidget):
 
         layout = QVBoxLayout(self)
 
+        # Variable setup
+        self.linecolor = LINECOLOR
+        self.linewidth = LINEWIDTH
+        self.sel_linecolor = SEL_LINECOLOR
+        self.sel_linewidth = SEL_LINEWIDTH
+
+        # Tracing options
         self.options = {
             "OCCULT-2" : OCCULTParams()
             }
@@ -221,6 +243,10 @@ class ManualTab(QWidget):
         # Variable initiation
         self.selected_line = None
         self.drawcache = []
+        self.linecolor = LINECOLOR
+        self.linewidth = LINEWIDTH
+        self.sel_linecolor = SEL_LINECOLOR
+        self.sel_linewidth = SEL_LINEWIDTH
         self.f_data = OrderedDict()
 
         # Button to open previous or automatic data
@@ -272,12 +298,16 @@ class ManualTab(QWidget):
                 x = np.array([coord[0] for coord in self.drawcache])
                 y = np.array([coord[1] for coord in self.drawcache])
                 self.selected_line.set_data(x,y)
-                self.redraw_canvas(full=False)
+                self.redraw_canvas()
             else:
                 # Initialize the line if None
-                self.selected_line, = self.ax.plot(ix,iy, color="red", linewidth=2)
+                self.selected_line, = self.ax.plot(
+                    ix,iy, 
+                    color=self.sel_linecolor, 
+                    linewidth=self.sel_linewidth
+                    )
                 self.drawcache.append((ix,iy))
-                self.redraw_canvas(full=False)
+                self.redraw_canvas()
         else:
             # Select line
             closest_distance = 10000
@@ -285,8 +315,8 @@ class ManualTab(QWidget):
             # Reset previously selected line, if any
             self.deselect_line()
             if self.selected_line:
-                self.selected_line.set_color("blue")
-                self.selected_line.set_linewidth(1)
+                self.selected_line.set_color(self.linecolor)
+                self.selected_line.set_linewidth(self.linewidth)
             for line in self.ax.get_lines():
                 xdata = line.get_xdata()
                 ydata = line.get_ydata()
@@ -296,8 +326,8 @@ class ManualTab(QWidget):
                     closest_distance = np.sort(d[d<=closest_distance])[0]
                     closest_line = line
             if closest_line:
-                closest_line.set_color((1,0,0))
-                closest_line.set_linewidth(2)
+                closest_line.set_color(self.sel_linecolor)
+                closest_line.set_linewidth(self.sel_linewidth)
                 self.selected_line = closest_line
             self.redraw_canvas(full=False)
             
@@ -306,8 +336,8 @@ class ManualTab(QWidget):
         Unselect a selected line, if any.
         """
         if self.selected_line:
-            self.selected_line.set_color("blue")
-            self.selected_line.set_linewidth(1)
+            self.selected_line.set_color(self.linecolor)
+            self.selected_line.set_linewidth(self.linewidth)
             self.selected_line = None
     
     def delete_line(self):
@@ -361,7 +391,7 @@ class ManualTab(QWidget):
                 else:
                     x = [c["coord"][0] for c in self.f_data[f_num]]
                     y = [c["coord"][1] for c in self.f_data[f_num]]
-                    self.ax.plot(x,y, color="blue", linewidth=1, markersize=1)
+                    self.ax.plot(x,y, color=self.linecolor, linewidth=self.linewidth)
                     # Set the new feature number
                     f_num = int(row[0])
                     coord = {"coord" : (float(row[1]), float(row[2]))}
@@ -419,6 +449,11 @@ class OCCULTParams(QWidget):
         self.ax = None
         self.results = None
         self.pcolor = (0,0,1,1)
+        self.linecolor = LINECOLOR
+        self.linewidth = LINEWIDTH
+        self.sel_linecolor = SEL_LINECOLOR
+        self.sel_linewidth = SEL_LINEWIDTH
+
 
         # Layout for the section
         layout = QVBoxLayout(self)
@@ -563,7 +598,7 @@ class OCCULTParams(QWidget):
             for coord in result:
                 x.append(coord[0])
                 y.append(coord[1])
-            self.ax.plot(x,y, color=self.pcolor, linewidth=0.5)
+            self.ax.plot(x,y, color=self.linecolor, linewidth=self.linewidth)
 
         # Refresh the canvas
         self.ax.draw_artist(self.ax.patch)
