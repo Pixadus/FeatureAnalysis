@@ -243,6 +243,7 @@ class ManualTab(QWidget):
         # Add save button to layout
         self.saveButton = QPushButton("Save data")
         self.saveButton.setEnabled(False)
+        self.saveButton.clicked.connect(self.save_data)
         layout.addWidget(self.saveButton)
     
     def process_click(self, event):
@@ -347,6 +348,26 @@ class ManualTab(QWidget):
         # Redraw everything
         self.redraw_canvas()
         self.saveButton.setEnabled(True)
+    
+    def save_data(self):
+        """
+        Save the manual data.
+        """
+        dialog = QFileDialog()
+        # We're saving a file, not opening here
+        dialog.setAcceptMode(QFileDialog.AcceptSave)
+        dialog.setFileMode(QFileDialog.AnyFile)
+        # Returned path is a tuple of (path, file_type)
+        save_path = dialog.getSaveFileName(self, "Save results", filter="CSV file (*.csv)")[0]
+        if len(save_path) == 0:
+            return
+        f_num = 0
+        with open(save_path, 'w') as csvfile:
+            cw = csv.writer(csvfile)
+            for line in self.ax.get_lines():
+                f_num += 1
+                for x,y in zip(line.get_data()[0], line.get_data()[1]):
+                    cw.writerow([f_num, x, y])
 
     def set_mpl(self, canvas, ax):
         """

@@ -453,7 +453,7 @@ class EditFITSWidget(QWidget):
         dialog.setAcceptMode(QFileDialog.AcceptSave)
         dialog.setFileMode(QFileDialog.AnyFile)
         # Returned path is a tuple of (path, file_type)
-        save_path = dialog.getSaveFileName(self, "Save results", filter="CSV file (*.fits)")[0]
+        save_path = dialog.getSaveFileName(self, "Save results", filter="FITS file (*.fits)")[0]
         
         hdu = fits.PrimaryHDU(self.img_alt)
         hdu.writeto(save_path)
