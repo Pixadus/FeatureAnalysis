@@ -20,7 +20,11 @@ class ZoomPan:
         self.y1 = None
         self.xpress = None
         self.ypress = None
-        self.ax = None
+        self.ax = ax
+    
+        if self.ax:
+            self.zoom_factory(self.ax)
+            self.pan_factory(self.ax)
 
     def zoom_factory(self, ax, base_scale = 1.1):
         def zoom(event):

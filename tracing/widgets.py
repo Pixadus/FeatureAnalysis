@@ -59,9 +59,7 @@ class TracingWidget(QWidget):
         self.ax.get_yaxis().set_visible(False)
 
         # Add pan and zoom functionality
-        zp = ZoomPan()
-        zp.zoom_factory(self.ax)
-        zp.pan_factory(self.ax)
+        ZoomPan(self.ax)
 
         # Layout for the vertical bar on the right
         controlLayout = QVBoxLayout()
