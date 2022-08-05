@@ -15,11 +15,12 @@ from PySide6.QtWidgets import (QColorDialog, QComboBox, QFileDialog,
                             QLabel, QLineEdit, QPushButton,
                             QTabWidget, QVBoxLayout, QWidget)
 from astropy.io import fits
-import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib import (pyplot, colors)
 from tracing.tracing import (AutoTracingOCCULT)
+from helper.functions import ZoomPan
 from collections import OrderedDict
+import numpy as np
 import csv
 
 # Global variables
@@ -56,6 +57,11 @@ class TracingWidget(QWidget):
         # Hide the axes
         self.ax.get_xaxis().set_visible(False)
         self.ax.get_yaxis().set_visible(False)
+
+        # Add pan and zoom functionality
+        zp = ZoomPan()
+        zp.zoom_factory(self.ax)
+        zp.pan_factory(self.ax)
 
         # Layout for the vertical bar on the right
         controlLayout = QVBoxLayout()
