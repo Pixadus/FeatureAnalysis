@@ -254,6 +254,11 @@ class PreprocessWidget(QWidget):
             -------
             params : list
             """
+            # Set the placeholder text to the actual text if run without an entry
+            for param in [self.sigmaEdit]:
+                if len(param.text()) == 0:
+                    param.setText(param.placeholderText())
+
             sigma = self.sigmaEdit.text()
             mode = self.modesEdit.currentText()
 
@@ -296,6 +301,11 @@ class PreprocessWidget(QWidget):
             -------
             params : list
             """
+            # Set the placeholder text to the actual text if run without an entry
+            for param in [self.kernelEdit, self.sigmaEdit, self.amountEdit, self.threshEdit]:
+                if len(param.text()) == 0:
+                    param.setText(param.placeholderText())
+
             kern = self.kernelEdit.text()
             kern = tuple([int(k) for k in kern.split(",")])
             sigma = self.sigmaEdit.text()
@@ -341,6 +351,11 @@ class PreprocessWidget(QWidget):
             -------
             params : list
             """
+            # Set the placeholder text to the actual text if run without an entry
+            for param in [self.wlenEdit, self.smrEdit, self.fracEdit]:
+                if len(param.text()) == 0:
+                    param.setText(param.placeholderText())
+
             wlen = int(self.wlenEdit.text())
             smr = int(self.smrEdit.text())
             frac = float(self.fracEdit.text())

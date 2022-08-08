@@ -129,11 +129,13 @@ class TracingWidget(QWidget):
                 self.autoTab.options[opt].update_buttons(image_path, self.image_data)
             self.canvas.draw()
 
-        # Try to enable color map
+        # Try to enable buttons
         if image_path == '':
             self.cmapBox.setEnabled(False)
         else:
             self.cmapBox.setEnabled(True)
+            self.manTab.openButton.setEnabled(True)
+            self.manTab.lineButton.setEnabled(True)
     
     def set_cmap(self):
         """
@@ -254,9 +256,10 @@ class ManualTab(QWidget):
         self.f_data = OrderedDict()
 
         # Button to open previous or automatic data
-        openButton = QPushButton("Open data (optional)")
-        openButton.clicked.connect(self.open_data)
-        layout.addWidget(openButton)
+        self.openButton = QPushButton("Open data (optional)")
+        self.openButton.clicked.connect(self.open_data)
+        self.openButton.setEnabled(False)
+        layout.addWidget(self.openButton)
         
         # Image controls box
         controlBox = QGroupBox("Controls")
@@ -265,12 +268,21 @@ class ManualTab(QWidget):
         layout.addWidget(controlBox)
 
         # Add buttons to controls box
-        self.bezierButton = QPushButton("Bezier")
         self.lineButton = QPushButton("Line")
-        self.bezierButton.setCheckable(True)
         self.lineButton.setCheckable(True)
-        controlLayout.addWidget(self.bezierButton)
+        self.lineButton.setEnabled(False)
         controlLayout.addWidget(self.lineButton)
+
+        # Controls hints box
+        selBox = QGroupBox("Shortcuts")
+        selLayout = QVBoxLayout()
+        selBox.setLayout(selLayout)
+        selLayout.addWidget(QLabel("<Click> to select line/place point"))
+        selLayout.addWidget(QLabel("<Esc> or <Enter> to deselect line"))
+        selLayout.addWidget(QLabel("<Del> or <Bckspc> to delete line"))
+        selLayout.addWidget(QLabel("<Scroll> to zoom"))
+        selLayout.addWidget(QLabel("<Click-Hold> to pan"))
+        layout.addWidget(selBox)
 
         # Add save button to layout
         self.saveButton = QPushButton("Save data")
@@ -286,15 +298,12 @@ class ManualTab(QWidget):
         click is used to select a feature line. Enter/esc
         key deselects feature.
 
-        If either Bezier or Line is selected, trace line until
+        If Line is selected, trace line until
         enter/esc key is pressed. Highlight active line in different
         color.
         """
         ix, iy = event.xdata, event.ydata
-        if self.bezierButton.isChecked():
-            # Draw a Bezier curve
-            print("Bezier is checked")
-        elif self.lineButton.isChecked():
+        if self.lineButton.isChecked():
             # Draw a multi-point line
             if self.selected_line:
                 # Add point to line if Some
@@ -578,41 +587,124 @@ class OCCULTParams(QWidget):
         # Create an AutoTracingOCCULT instance
         at = AutoTracingOCCULT(self.image_path)
 
+        # Check if there is a range of parameters
+        self.multiparams = {}
+        for param in params:
+            if param.text().count(",") == 1 and param != self.qthresh1 and param != self.qthresh2:
+                start = param.text().split(",")[0]
+                end = param.text().split(",")[1]
+                self.multiparams[param] = [int(start), int(end)]
+            elif param.text().count(",") == 1 and param == self.qthresh1 and param == self.qthresh2:
+                start = param.text().split(",")[0]
+                end = param.text().split(",")[1]
+                self.multiparams[param] = [float(start), float(end)]            
+            elif param.text().count(",") > 1:
+                print("Error: Too many commas in ", param.text())
+                return
+
         # Run OCCULT-2
-        self.results = at.run(
-            int(self.nsm1.displayText()),
-            int(self.rmin.text()),
-            int(self.lmin.text()),
-            int(self.nstruc.text()),
-            int(self.ngap.text()),
-            float(self.qthresh1.text()),
-            float(self.qthresh2.text())
-        )
+        if len(self.multiparams) == 0:
+            self.results = at.run(
+                int(self.nsm1.displayText()),
+                int(self.rmin.text()),
+                int(self.lmin.text()),
+                int(self.nstruc.text()),
+                int(self.ngap.text()),
+                float(self.qthresh1.text()),
+                float(self.qthresh2.text())
+            )
 
-        # Clear the current axes from previous results
-        self.ax.cla()
+            # Clear the current axes from previous results
+            self.ax.cla()
 
-        # Reset the image, since it's cleared with cla()
-        self.ax.imshow(self.image_data, origin="lower")
+            # Reset the image, since it's cleared with cla()
+            self.ax.imshow(self.image_data, origin="lower")
 
-        # Plot the results
-        for result in self.results:
-            x = []
-            y = []
-            for coord in result:
-                x.append(coord[0])
-                y.append(coord[1])
-            self.ax.plot(x,y, color=self.linecolor, linewidth=self.linewidth)
+            # Plot the results
+            for result in self.results:
+                x = []
+                y = []
+                for coord in result:
+                    x.append(coord[0])
+                    y.append(coord[1])
+                self.ax.plot(x,y, color=self.linecolor, linewidth=self.linewidth)
 
-        # Refresh the canvas
-        self.ax.draw_artist(self.ax.patch)
-        self.canvas.update()
-        self.canvas.flush_events()
-        self.canvas.draw()
+            # Refresh the canvas
+            self.ax.draw_artist(self.ax.patch)
+            self.canvas.update()
+            self.canvas.flush_events()
+            self.canvas.draw()
 
-        # Enable the save & color buttons
-        self.saveButton.setEnabled(True)
-        self.analyzeButton.setEnabled(True)
+            # Enable the save & color buttons
+            try:
+                self.saveButton.clicked.disconnect()
+                self.saveButton.clicked.connect(self.save_results)
+            except:
+                pass
+            self.saveButton.setEnabled(True)
+            self.analyzeButton.setEnabled(True)
+        
+        # If we have multiple parameters selected
+        else:
+            self.results = OrderedDict()
+            for param in params:
+                if param not in self.multiparams:
+                    if param == self.qthresh1 or param == self.qthresh2:
+                        self.multiparams[param] = [float(param.text()), float(param.text())+0.25]
+                    else:
+                        self.multiparams[param] = [int(param.text()), int(param.text())+1]
+            
+            # Run OCCULT-2 over all ranges
+            for nsm1 in range(self.multiparams[self.nsm1][0], self.multiparams[self.nsm1][1]):
+                for rmin in range(self.multiparams[self.rmin][0], self.multiparams[self.rmin][1]):
+                    for lmin in range(self.multiparams[self.lmin][0], self.multiparams[self.lmin][1]):
+                        for nstruc in range(self.multiparams[self.nstruc][0], self.multiparams[self.nstruc][1],100):
+                            for ngap in range(self.multiparams[self.ngap][0], self.multiparams[self.ngap][1]):
+                                for qthresh1 in np.arange(self.multiparams[self.qthresh1][0], self.multiparams[self.qthresh1][1], 0.25):
+                                    for qthresh2 in np.arange(self.multiparams[self.qthresh2][0], self.multiparams[self.qthresh2][1], 0.25):
+                                        # Dictionary keys will be parameter set
+                                        key_name = "N{}R{}L{}NS{}NG{}Q1{}Q2{}".format(nsm1, rmin, lmin, nstruc, ngap, qthresh1, qthresh2)
+                                        print("Running OCCULT-2 for", key_name)
+                                        result = at.run(
+                                            nsm1,
+                                            rmin,
+                                            lmin,
+                                            nstruc,
+                                            ngap,
+                                            qthresh1,
+                                            qthresh2
+                                        )
+                                        self.results[key_name] = result
+
+            # Clear the current axes from previous results
+            self.ax.cla()
+
+            # Reset the image, since it's cleared with cla()
+            self.ax.imshow(self.image_data, origin="lower")
+
+            # Plot the results
+            for feature in self.results[key_name]:
+                x = []
+                y = []
+                for coord in feature:
+                    x.append(coord[0])
+                    y.append(coord[1])
+                self.ax.plot(x,y, color=self.linecolor, linewidth=self.linewidth)
+
+            # Refresh the canvas
+            self.ax.draw_artist(self.ax.patch)
+            self.canvas.update()
+            self.canvas.flush_events()
+            self.canvas.draw()
+
+            # Enable the save & color buttons
+            try:
+                self.saveButton.clicked.disconnect()
+                self.saveButton.clicked.connect(self.save_multiple)
+            except:
+                pass
+            self.saveButton.setEnabled(True)
+            self.analyzeButton.setEnabled(True)
 
     def save_results(self):
         """
@@ -632,8 +724,32 @@ class OCCULTParams(QWidget):
             for result in self.results:
                 f_count+=1
                 for coord in result:
-                        # TODO verify this is x,y and not y,x
                         resultwriter.writerow([f_count, coord[0], coord[1]])
+    
+    def save_multiple(self):
+        """
+        Save multiple results, if multiple parameters specified
+        """
+        dialog = QFileDialog()
+        # We're saving a file, not opening here
+        dialog.setAcceptMode(QFileDialog.AcceptSave)
+        # Only allow directories to be selected
+        dialog.setFileMode(QFileDialog.Directory)
+        # Returned path is a tuple of (path, file_type)
+        save_path = dialog.getExistingDirectory(self, "Select directory to save .fits in")
+
+        # Do nothing if the folder was not selected
+        if len(save_path) == 0:
+            return        
+        for paramset in self.results.keys():
+            # Save format will be { feature_id, x, y }
+            f_count = 0
+            with open(save_path+"/"+paramset+".csv", 'w') as outfile:
+                resultwriter = csv.writer(outfile)
+                for feature in self.results[paramset]:
+                    f_count+=1
+                    for coord in feature:
+                            resultwriter.writerow([f_count, coord[0], coord[1]])
 
     def analyze_results(self):
         """
