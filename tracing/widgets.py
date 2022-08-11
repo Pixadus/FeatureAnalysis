@@ -663,7 +663,7 @@ class OCCULTParams(QWidget):
                                 for qthresh1 in np.arange(self.multiparams[self.qthresh1][0], self.multiparams[self.qthresh1][1], 0.25):
                                     for qthresh2 in np.arange(self.multiparams[self.qthresh2][0], self.multiparams[self.qthresh2][1], 0.25):
                                         # Dictionary keys will be parameter set
-                                        key_name = "N{}R{}L{}NS{}NG{}Q1{}Q2{}".format(nsm1, rmin, lmin, nstruc, ngap, qthresh1, qthresh2)
+                                        key_name = "N{}-R{}-L{}-NS{}-NG{}-Q1{}-Q2{}".format(nsm1, rmin, lmin, nstruc, ngap, qthresh1, qthresh2)
                                         print("Running OCCULT-2 for", key_name)
                                         result = at.run(
                                             nsm1,

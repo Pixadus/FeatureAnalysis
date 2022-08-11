@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QTabWidget)
 from preprocessing.widgets import PreprocessWidget
 from tracing.widgets import TracingWidget
 from analysis.widgets import AnalysisWidget
+from optimization.widgets import OptimizationWidget
 from helper.widgets import HelperWidget
 
 class FeatureTracing(QApplication):
@@ -40,8 +41,9 @@ class FeatureTracing(QApplication):
 
             # Instantiate widgets
             preprocessing = PreprocessWidget()
-            analysis = AnalysisWidget()
             tracing = TracingWidget()
+            analysis = AnalysisWidget()
+            optimization = OptimizationWidget()
             helper = HelperWidget()
 
             # Set the analysis and tab widgets
@@ -52,6 +54,7 @@ class FeatureTracing(QApplication):
             tabs.addTab(preprocessing,"Preprocessing")
             tabs.addTab(tracing,"Tracing")
             tabs.addTab(analysis,"Analysis")
+            tabs.addTab(optimization,"Optimization")
             # tabs.addTab(label1,"Time Series")
             tabs.addTab(helper,"Helper functions")
 

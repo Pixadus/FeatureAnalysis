@@ -93,3 +93,15 @@ class ZoomPan:
 
         #return the function
         return(onMotion)
+
+def erase_layout_widgets(layout):
+    """
+    Function to remove all widgets contained inside
+    a given layout.
+
+    Parameters
+    ----------
+    layout : QLayout
+    """
+    for i in reversed(range(layout.count())):
+        layout.itemAt(i).widget().setParent(None)
