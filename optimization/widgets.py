@@ -19,7 +19,7 @@ import csv
 import os
 
 # Constants
-MAX_DISTANCE = 10.0
+MAX_DISTANCE = 20.0
 PLOT_MATCHES = False
 
 class OptimizationWidget(QWidget):
@@ -105,7 +105,7 @@ class OptimizationWidget(QWidget):
             }
             for row in reader:
                 # If we're on the same feature, continue adding to it
-                if f_num == int(row[0]):
+                if f_num == int(float(row[0])):
                     feature['x'].append(float(row[1]))
                     feature['y'].append(float(row[2]))
                 # Otherwise, create a new feature
@@ -116,7 +116,7 @@ class OptimizationWidget(QWidget):
                         'x' : [float(row[1])],
                         'y' : [float(row[2])]
                     }
-                    f_num = int(row[0])
+                    f_num = int(float(row[0]))
             # Calculate coordinate averages
             for feature in features:
                 feature['avgx'] = np.mean(feature['x'])
@@ -151,7 +151,7 @@ class OptimizationWidget(QWidget):
                 }
                 for row in reader:
                     # If we're on the same feature, continue adding to it
-                    if f_num == int(row[0]):
+                    if f_num == int(float(row[0])):
                         feature['x'].append(float(row[1]))
                         feature['y'].append(float(row[2]))
                     # Otherwise, create a new feature
@@ -162,7 +162,7 @@ class OptimizationWidget(QWidget):
                             'x' : [float(row[1])],
                             'y' : [float(row[2])]
                         }
-                        f_num = int(row[0])
+                        f_num = int(float(row[0]))
                 # Calculate coordinate averages
                 for feature in features:
                     feature['avgx'] = np.mean(feature['x'])
@@ -229,7 +229,6 @@ class OptimizationWidget(QWidget):
                 print(mf_matched, mf_count)
 
                 # Add the results to the resultBox
-                self.resultLayout.addWidget(
-                    QLabel(
+                self.resultLayout.addWidget(QLabel(
                             os.path.basename(autoFile)+' | M: {:.2f}% | A: {:.2f}%'.format(mf_percentage, af_percentage)
                         ))
