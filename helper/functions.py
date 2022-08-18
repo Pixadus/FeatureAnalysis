@@ -20,6 +20,7 @@ class ZoomPan:
         self.y1 = None
         self.xpress = None
         self.ypress = None
+        self.pan = True
         self.ax = ax
     
         if self.ax:
@@ -63,26 +64,29 @@ class ZoomPan:
     def pan_factory(self, ax):
         def onPress(event):
             if event.inaxes != ax: return
-            self.cur_xlim = ax.get_xlim()
-            self.cur_ylim = ax.get_ylim()
-            self.press = self.x0, self.y0, event.xdata, event.ydata
-            self.x0, self.y0, self.xpress, self.ypress = self.press
+            if self.pan:
+                self.cur_xlim = ax.get_xlim()
+                self.cur_ylim = ax.get_ylim()
+                self.press = self.x0, self.y0, event.xdata, event.ydata
+                self.x0, self.y0, self.xpress, self.ypress = self.press
 
         def onRelease(event):
-            self.press = None
-            ax.figure.canvas.draw()
+            if self.pan:
+                self.press = None
+                ax.figure.canvas.draw()
 
         def onMotion(event):
             if self.press is None: return
             if event.inaxes != ax: return
-            dx = event.xdata - self.xpress
-            dy = event.ydata - self.ypress
-            self.cur_xlim -= dx
-            self.cur_ylim -= dy
-            ax.set_xlim(self.cur_xlim)
-            ax.set_ylim(self.cur_ylim)
+            if self.pan:
+                dx = event.xdata - self.xpress
+                dy = event.ydata - self.ypress
+                self.cur_xlim -= dx
+                self.cur_ylim -= dy
+                ax.set_xlim(self.cur_xlim)
+                ax.set_ylim(self.cur_ylim)
 
-            ax.figure.canvas.draw()
+                ax.figure.canvas.draw()
 
         fig = ax.get_figure() # get the figure of interest
 
@@ -91,7 +95,7 @@ class ZoomPan:
         fig.canvas.mpl_connect('button_release_event',onRelease)
         fig.canvas.mpl_connect('motion_notify_event',onMotion)
 
-        #return the function
+        # return the function
         return(onMotion)
 
 def erase_layout_widgets(layout):

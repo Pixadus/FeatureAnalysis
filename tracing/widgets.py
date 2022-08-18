@@ -13,7 +13,8 @@ from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (QColorDialog, QComboBox, QFileDialog, 
                             QFormLayout, QGroupBox, QHBoxLayout, 
                             QLabel, QLineEdit, QPushButton,
-                            QTabWidget, QVBoxLayout, QWidget)
+                            QSizePolicy, QTabWidget, QVBoxLayout, 
+                            QWidget)
 from astropy.io import fits
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib import (pyplot, colors)
@@ -47,6 +48,7 @@ class TracingWidget(QWidget):
         self.figure = pyplot.figure()
         self.ax = self.figure.add_axes([0,0,1,1])
         self.canvas = FigureCanvasQTAgg(self.figure)
+        self.canvas.setSizePolicy(QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding))
         layout.addWidget(self.canvas)
 
         # Set the background color of the canvas
@@ -59,10 +61,15 @@ class TracingWidget(QWidget):
         self.ax.get_yaxis().set_visible(False)
 
         # Add pan and zoom functionality
-        ZoomPan(self.ax)
+        self.zp = ZoomPan(self.ax)
+
+        # Add container widget for layout on right
+        controlWidget = QWidget()
+        controlWidget.setMaximumWidth(300)
 
         # Layout for the vertical bar on the right
         controlLayout = QVBoxLayout()
+        controlWidget.setLayout(controlLayout)
 
         # Button to open an image
         openButton = QPushButton("Open image")
@@ -91,7 +98,21 @@ class TracingWidget(QWidget):
         self.colorPicker = QColorDialog()
         self.colorButton = QPushButton("Select")
         self.colorButton.clicked.connect(self.set_color)
+        self.colorButton.setEnabled(False)
         plotConfigLayout.addRow(QLabel("Line color:"), self.colorButton)
+
+        # Add line width configuration
+        widthWidget = QWidget()
+        self.widthTextBox = QLineEdit()
+        self.widthTextBox.setPlaceholderText("1.0")
+        self.widthButton = QPushButton("Set")
+        self.widthButton.clicked.connect(self.set_linewidth)
+        self.widthButton.setEnabled(False)
+        widthLayout = QHBoxLayout()
+        widthLayout.addWidget(self.widthTextBox)
+        widthLayout.addWidget(self.widthButton)
+        widthWidget.setLayout(widthLayout)
+        plotConfigLayout.addRow(QLabel("Line width:"), widthWidget)
 
         # Add plot config box to OCCULT box
         controlLayout.addWidget(plotConfig)
@@ -100,6 +121,7 @@ class TracingWidget(QWidget):
         tabs = QTabWidget()
         self.autoTab = AutoTab()
         self.manTab = ManualTab()
+        self.manTab.zp = self.zp
         self.canvas.mpl_connect('button_press_event', self.manTab.process_click)
         self.manTab.set_mpl(self.canvas, self.ax)
         for pset in self.autoTab.options.keys():
@@ -108,7 +130,7 @@ class TracingWidget(QWidget):
         tabs.addTab(self.autoTab, "Automatic")
         tabs.addTab(self.manTab, "Manual")
         controlLayout.addWidget(tabs)
-        layout.addLayout(controlLayout)
+        layout.addWidget(controlWidget)
     
     def open_image(self):
         """
@@ -134,6 +156,8 @@ class TracingWidget(QWidget):
             self.cmapBox.setEnabled(False)
         else:
             self.cmapBox.setEnabled(True)
+            self.widthButton.setEnabled(True)
+            self.colorButton.setEnabled(True)
             self.manTab.openButton.setEnabled(True)
             self.manTab.lineButton.setEnabled(True)
     
@@ -170,10 +194,32 @@ class TracingWidget(QWidget):
         self.manTab.linecolor = self.pcolor
 
         # Redraw everything
-        self.ax.draw_artist(self.ax.patch)
-        self.canvas.update()
-        self.canvas.flush_events()
-        self.canvas.draw()
+        self.redraw_canvas()
+
+    def set_linewidth(self):
+        """
+        Sets the line width of all current lines.
+        """
+        try:
+            width = float(self.widthTextBox.text())
+        except:
+            print("Unable to interpret text width.")
+            return
+
+        for line in self.ax.get_lines():
+            line.set_linewidth(width)
+
+        # Set widths for new lines in each class
+        self.autoTab.linewidth = width
+        self.autoTab.sel_linewidth = width
+        for opt in self.autoTab.options.keys():
+            self.autoTab.options[opt].linewidth = width
+            self.autoTab.options[opt].sel_linewidth = width
+        self.manTab.linewidth = width
+        self.manTab.sel_linewidth = width
+
+        # Redraw everything
+        self.redraw_canvas()
 
     def keyPressEvent(self, event):
         """
@@ -182,12 +228,24 @@ class TracingWidget(QWidget):
         if event.key() == Qt.Key_Escape or event.key() == Qt.Key_Enter or event.key() == Qt.Key_Return:
             self.manTab.deselect_line()
             self.manTab.empty_drawcache()
-            self.manTab.redraw_canvas()
+            self.manTab.redraw_canvas(full=False)
         if event.key() == Qt.Key_Delete or event.key() == Qt.Key_Backspace:
             self.manTab.delete_line()
-            self.manTab.redraw_canvas()
             self.manTab.deselect_line()
+            self.manTab.redraw_canvas(full=False)
         return
+
+    def redraw_canvas(self, full=False):
+        """
+        Refresh the canvas
+        """
+        if full:
+            self.ax.draw_artist(self.ax.patch)
+            self.canvas.update()
+            self.canvas.flush_events()
+            self.canvas.draw()
+        else:
+            self.canvas.draw()
 
 class AutoTab(QWidget):
     def __init__(self):
@@ -248,6 +306,7 @@ class ManualTab(QWidget):
 
         # Variable initiation
         self.selected_line = None
+        self.zp = None
         self.drawcache = []
         self.linecolor = LINECOLOR
         self.linewidth = LINEWIDTH
@@ -263,7 +322,8 @@ class ManualTab(QWidget):
         
         # Image controls box
         controlBox = QGroupBox("Controls")
-        controlLayout = QHBoxLayout()
+        controlLayout = QVBoxLayout()
+        controlLayout.setAlignment(Qt.AlignTop)
         controlBox.setLayout(controlLayout)
         layout.addWidget(controlBox)
 
@@ -271,11 +331,13 @@ class ManualTab(QWidget):
         self.lineButton = QPushButton("Line")
         self.lineButton.setCheckable(True)
         self.lineButton.setEnabled(False)
+        self.lineButton.clicked.connect(self.toggle_pan)
         controlLayout.addWidget(self.lineButton)
 
         # Controls hints box
         selBox = QGroupBox("Shortcuts")
         selLayout = QVBoxLayout()
+        selLayout.setAlignment(Qt.AlignTop)
         selBox.setLayout(selLayout)
         selLayout.addWidget(QLabel("<Click> to select line/place point"))
         selLayout.addWidget(QLabel("<Esc> or <Enter> to deselect line"))
@@ -286,9 +348,17 @@ class ManualTab(QWidget):
 
         # Add save button to layout
         self.saveButton = QPushButton("Save data")
-        self.saveButton.setEnabled(False)
         self.saveButton.clicked.connect(self.save_data)
         layout.addWidget(self.saveButton)
+    
+    def toggle_pan(self):
+        """
+        Toggle the pan functionality of the graph. 
+        """
+        if self.lineButton.isChecked():
+            self.zp.pan = False
+        else:
+            self.zp.pan = True
     
     def process_click(self, event):
         """
@@ -311,7 +381,7 @@ class ManualTab(QWidget):
                 x = np.array([coord[0] for coord in self.drawcache])
                 y = np.array([coord[1] for coord in self.drawcache])
                 self.selected_line.set_data(x,y)
-                self.redraw_canvas()
+                self.redraw_canvas(full=False)
             else:
                 # Initialize the line if None
                 self.selected_line, = self.ax.plot(
@@ -320,7 +390,7 @@ class ManualTab(QWidget):
                     linewidth=self.sel_linewidth
                     )
                 self.drawcache.append((ix,iy))
-                self.redraw_canvas()
+                self.redraw_canvas(full=False)
         else:
             # Select line
             closest_distance = 10000
