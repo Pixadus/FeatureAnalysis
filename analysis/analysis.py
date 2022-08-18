@@ -135,8 +135,14 @@ class Analysis:
                 dp = np.empty_like(v)
                 dp[0] = -v[1]
                 dp[1] = v[0]
+                if np.isnan(dp[0]) or np.isnan(dp[1]):
+                    dict_coord['breadth'] = 0.0
+                    continue
                 # Convert to unit vector
                 mag = np.sqrt(dp[0]**2+dp[1]**2)
+                if mag == 0:
+                    dict_coord['breadth'] = 0.0
+                    continue
                 dp[0] = dp[0]/mag
                 dp[1] = dp[1]/mag
                 # Array indices must be integers, rounding
@@ -146,7 +152,7 @@ class Analysis:
                 xs = []
                 ys = []
                 # Move in positive dp until we hit a Canny-identified edge
-                bp= 0
+                bp = 0
                 coord_offset = np.array([round(coord[1]),round(coord[0])])
                 try:
                     while edges[coord_offset[0],coord_offset[1]] == 0:

@@ -13,14 +13,16 @@ from PySide6.QtWidgets import (QWidget, QHBoxLayout, QGroupBox,
                             QLabel)
 from PySide6.QtCore import Qt
 from helper.functions import erase_layout_widgets
+from optimization.functions import (get_tracing_data, get_matches_avg_center, get_matches_avg_line, interpolate)
 import numpy as np
 import matplotlib.pyplot as plt
-import csv
 import os
 
 # Constants
-MAX_DISTANCE = 20.0
+MAX_DISTANCE = 30.0
 PLOT_MATCHES = False
+
+# It's worth working on this more - i.e. check length matches.
 
 class OptimizationWidget(QWidget):
     def __init__(self):
@@ -94,36 +96,16 @@ class OptimizationWidget(QWidget):
         # Erase previous data, if any
         erase_layout_widgets(self.manBoxLayout)
         # Manfile dict entry -> feature list -> ['x'],['y'],['matched'],['avgx'],['avgy']
-        self.manFiles = {}
-        with open(data[0]) as csvfile:
-            reader = csv.reader(csvfile)
-            f_num = None
-            features = []
-            feature = {
-                'x' : [],
-                'y' : []
-            }
-            for row in reader:
-                # If we're on the same feature, continue adding to it
-                if f_num == int(float(row[0])):
-                    feature['x'].append(float(row[1]))
-                    feature['y'].append(float(row[2]))
-                # Otherwise, create a new feature
-                else:
-                    if len(feature['x']) != 0 and len(feature['y']) != 0:
-                        features.append(feature)
-                    feature = {
-                        'x' : [float(row[1])],
-                        'y' : [float(row[2])]
-                    }
-                    f_num = int(float(row[0]))
-            # Calculate coordinate averages
-            for feature in features:
-                feature['avgx'] = np.mean(feature['x'])
-                feature['avgy'] = np.mean(feature['y'])
-                feature['matched'] = False
-            self.manFiles[data[0]] = features
-        self.manBoxLayout.addWidget(QLabel(os.path.basename(data[0])))
+        self.manFiles = get_tracing_data([data[0]])
+        # Interpolate per-pixel coordinates. 
+        for manFile in self.manFiles.keys():
+            for man_line in self.manFiles[manFile]:
+                if len(man_line['x']) >= 2 and len(man_line['y']) >= 2:
+                    man_line['x'], man_line['y'] = interpolate(man_line['x'], man_line['y'])
+                    man_line['avgx'] = np.mean(man_line['x'])
+                    man_line['avgy'] = np.mean(man_line['y'])
+        for path in self.manFiles.keys():
+            self.manBoxLayout.addWidget(QLabel(os.path.basename(path)))
 
     def open_automatic(self):
         """
@@ -139,36 +121,8 @@ class OptimizationWidget(QWidget):
         # Erase previous data, if any
         erase_layout_widgets(self.autoBoxLayout)
         # Autofile dict entry -> feature list -> ['x'],['y'],['matched'],['avgx'],['avgy']
-        self.autoFiles = {}
-        for path in data[0]:
-            with open(path) as csvfile:
-                reader = csv.reader(csvfile)
-                f_num = None
-                features = []
-                feature = {
-                    'x' : [],
-                    'y' : []
-                }
-                for row in reader:
-                    # If we're on the same feature, continue adding to it
-                    if f_num == int(float(row[0])):
-                        feature['x'].append(float(row[1]))
-                        feature['y'].append(float(row[2]))
-                    # Otherwise, create a new feature
-                    else:
-                        if len(feature['x']) != 0 and len(feature['y']) != 0:
-                            features.append(feature)
-                        feature = {
-                            'x' : [float(row[1])],
-                            'y' : [float(row[2])]
-                        }
-                        f_num = int(float(row[0]))
-                # Calculate coordinate averages
-                for feature in features:
-                    feature['avgx'] = np.mean(feature['x'])
-                    feature['avgy'] = np.mean(feature['y'])
-                    feature['matched'] = False
-                self.autoFiles[path] = features
+        self.autoFiles = get_tracing_data(data[0])
+        for path in self.autoFiles.keys():
             self.autoBoxLayout.addWidget(QLabel(os.path.basename(path)))
 
     def optimize(self):
@@ -178,28 +132,10 @@ class OptimizationWidget(QWidget):
         measurements.
         """
         erase_layout_widgets(self.resultLayout)
-        for manFile in self.manFiles.keys():
-            for autoFile in self.autoFiles.keys():
-                # Iterate through manual features
-                for mf in self.manFiles[manFile]:
-                    # Reset matches
-                    mf['matched'] = False
-                    closest_match = None
-                    closest_distance = np.Infinity
-                    # Iterate over all auto features. Look for closest match.
-                    for af in self.autoFiles[autoFile]:
-                        if not af['matched']:
-                            mf_avgc = np.array([mf['avgx'], mf['avgy']])
-                            af_avgc = np.array([af['avgx'], af['avgy']])
-                            dist = np.linalg.norm(np.abs(mf_avgc-af_avgc))
-                            # Check if distance between two lines is within the threshold, and closest
-                            if dist <= MAX_DISTANCE and dist < closest_distance:
-                                closest_match = af
-                                closest_distance = dist
-                    if closest_match is not None:
-                        ind = self.autoFiles[autoFile].index(closest_match)
-                        self.autoFiles[autoFile][ind]['matched'] = True
-                        mf['matched'] = True
+        self.manFiles, self.autoFiles = get_matches_avg_center(self.manFiles, self.autoFiles, 30.0)
+        manFiles, autoFiles = get_matches_avg_line(self.manFiles, self.autoFiles, 30.0)
+        for manFile in self.manFiles:
+            for autoFile in self.autoFiles:
                 if PLOT_MATCHES:
                     for mf in self.manFiles[manFile]:
                         if mf['matched']:
@@ -232,3 +168,4 @@ class OptimizationWidget(QWidget):
                 self.resultLayout.addWidget(QLabel(
                             os.path.basename(autoFile)+' | M: {:.2f}% | A: {:.2f}%'.format(mf_percentage, af_percentage)
                         ))
+    

@@ -226,7 +226,7 @@ class AnalysisWidget(QWidget):
                 self.f_data[f_num] = []
                 for row in data:
                     # If a coordinate in the same feature
-                    if int(row[0]) == f_num:
+                    if int(float(row[0])) == f_num:
                         coord = {"coord" : (float(row[1]), float(row[2]))}
                         self.f_data[f_num].append(coord)
                     # If a new feature
@@ -235,7 +235,7 @@ class AnalysisWidget(QWidget):
                         y = [c["coord"][1] for c in self.f_data[f_num]]
                         self.ax.plot(x,y, color="blue", linewidth=1, markersize=1)
                         # Set the new feature number
-                        f_num = int(row[0])
+                        f_num = int(float(row[0]))
                         coord = {"coord" : (float(row[1]), float(row[2]))}
                         # Initialize the coordinate list, add current coord
                         self.f_data[f_num] = [coord]
