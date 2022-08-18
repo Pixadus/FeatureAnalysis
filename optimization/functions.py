@@ -37,7 +37,7 @@ def get_tracing_data(tracing_list):
     """
     contents = {}
     for path in tracing_list:
-        with open(path) as csvfile:
+        with open(path, newline='') as csvfile:
             reader = csv.reader(csvfile)
             f_num = None
             features = []

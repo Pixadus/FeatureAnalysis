@@ -90,7 +90,7 @@ class AutoTracingOCCULT:
             Path to save the .csv containing features to
         """
 
-        with open(save_path, 'w', encoding='utf8') as savefile:
+        with open(save_path, 'w', encoding='utf8', newline='') as savefile:
             savewriter = csv.writer(savefile)
             fibril_num = 1
             for fibril in features:

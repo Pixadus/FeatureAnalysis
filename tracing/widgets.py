@@ -461,11 +461,12 @@ class ManualTab(QWidget):
             return
 
         # Try to open data and set graph data
-        with open(data_path) as datafile:
+        with open(data_path, newline='') as datafile:
             data = csv.reader(datafile)
             f_num = 0
             self.f_data[f_num] = []
             for row in data:
+                print(row)
                 # If a coordinate in the same feature
                 if int(float(row[0])) == f_num:
                     coord = {"coord" : (float(row[1]), float(row[2]))}
@@ -498,7 +499,7 @@ class ManualTab(QWidget):
         if len(save_path) == 0:
             return
         f_num = 0
-        with open(save_path, 'w') as csvfile:
+        with open(save_path, 'w', newline='') as csvfile:
             cw = csv.writer(csvfile)
             for line in self.ax.get_lines():
                 f_num += 1
@@ -789,7 +790,7 @@ class OCCULTParams(QWidget):
         
         # Save format will be { feature_id, x, y }
         f_count = 0
-        with open(save_path, 'w') as outfile:
+        with open(save_path, 'w', newline='') as outfile:
             resultwriter = csv.writer(outfile)
             for result in self.results:
                 f_count+=1
@@ -814,7 +815,7 @@ class OCCULTParams(QWidget):
         for paramset in self.results.keys():
             # Save format will be { feature_id, x, y }
             f_count = 0
-            with open(save_path+"/"+paramset+".csv", 'w') as outfile:
+            with open(save_path+"/"+paramset+".csv", 'w', newline='') as outfile:
                 resultwriter = csv.writer(outfile)
                 for feature in self.results[paramset]:
                     f_count+=1

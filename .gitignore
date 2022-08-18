@@ -6,4 +6,4 @@ __pycache__
 data/images/sav/
 
 # Ignore tracing results
-data/tracing_results/*
+#data/tracing_results/*
