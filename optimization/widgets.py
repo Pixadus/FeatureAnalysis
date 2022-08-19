@@ -132,8 +132,7 @@ class OptimizationWidget(QWidget):
         measurements.
         """
         erase_layout_widgets(self.resultLayout)
-        self.manFiles, self.autoFiles = get_matches_avg_center(self.manFiles, self.autoFiles, 30.0)
-        manFiles, autoFiles = get_matches_avg_line(self.manFiles, self.autoFiles, 30.0)
+        self.manFiles, self.autoFiles = get_matches_avg_line(self.manFiles, self.autoFiles, 30.0)
         for manFile in self.manFiles:
             for autoFile in self.autoFiles:
                 if PLOT_MATCHES:

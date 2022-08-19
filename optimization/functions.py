@@ -124,6 +124,7 @@ def get_matches_avg_line(manFiles, autoFiles, max_distance=30.0):
     """
     # Limit to how many "close" features we should look at
     CLOSEST_LIMIT = 10
+    MAX_DISTANCE = max_distance
 
     for manFile in manFiles.keys():
         for autoFile in autoFiles.keys():
@@ -134,18 +135,33 @@ def get_matches_avg_line(manFiles, autoFiles, max_distance=30.0):
                 mavg = np.array([man_line['avgx'], man_line['avgy']])
                 for auto_line in autoFiles[autoFile]:
                     aavg = np.array([auto_line['avgx'], auto_line['avgy']])
-                    distance = np.linalg.norm(np.abs(mavg-aavg))
+                    distance = np.around(np.linalg.norm(np.abs(mavg-aavg)), 3)
                     distances[distance] = auto_line
-                sorted_distances = np.sort(distances.keys())
+                sorted_distances = sorted(distances.keys())
                 for dist in zip(sorted_distances, range(CLOSEST_LIMIT)):
+                    dist = dist[0]
                     closest_auto[dist] = distances[dist]
-                print("Closest:", closest_auto)
-                    
-
-
-
-
-
+                # Calculate the per-pixel distance to each of the 10 autofeatures
+                closest_feature = None
+                closest_distance = np.Infinity
+                for dist in closest_auto.keys():
+                    auto_line = closest_auto[dist]
+                    auto_index = autoFiles[autoFile].index(auto_line)
+                    distances = []
+                    for mx, my in zip(man_line['x'], man_line['y']):
+                        for ax, ay in zip(auto_line['x'], auto_line['y']):
+                            mc = np.array([mx,my])
+                            ac = np.array([ax,ay])
+                            d = np.linalg.norm(np.abs(mc-ac))
+                            distances.append(d)
+                    avg_dist = np.mean(distances)
+                    if avg_dist < closest_distance and avg_dist <= MAX_DISTANCE:
+                        closest_feature = auto_index
+                        closest_distance = avg_dist
+                if closest_distance != np.Infinity:
+                    man_line['matched'] = True
+                    autoFiles[autoFile][closest_feature]['matched'] = True
+    return(manFiles, autoFiles)
 
 def interpolate(linex, liney):
     """
