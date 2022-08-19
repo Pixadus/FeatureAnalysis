@@ -106,7 +106,7 @@ def get_matches_avg_center(manFiles, autoFiles, max_distance):
                     mf['matched'] = True
     return(manFiles, autoFiles)
 
-def get_matches_avg_line(manFiles, autoFiles, max_distance=30.0):
+def get_matches_avg_line(manFiles, autoFiles, max_distance=np.Infinity):
     """
     Get matches by matching on a per-pixel basis. Interpolates
     along supplied manual lines. 
