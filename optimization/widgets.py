@@ -8,12 +8,13 @@ Created on Tue 8.9.22
 parameter sets compared to manual tracing.
 """
 
+from pickletools import optimize
 from PySide6.QtWidgets import (QWidget, QHBoxLayout, QGroupBox,
                             QPushButton, QVBoxLayout, QFileDialog,
-                            QLabel)
-from PySide6.QtCore import Qt
+                            QLabel, QScrollArea, QSizePolicy)
+from PySide6.QtCore import Qt, QSize, QRunnable, QThreadPool, Slot
 from helper.functions import erase_layout_widgets
-from optimization.functions import (get_tracing_data, get_matches_avg_center, get_matches_avg_line, interpolate)
+from optimization.functions import (get_tracing_data, get_matches_avg_center, interpolate)
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -21,8 +22,6 @@ import os
 # Constants
 MAX_DISTANCE = 30.0
 PLOT_MATCHES = False
-
-# It's worth working on this more - i.e. check length matches.
 
 class OptimizationWidget(QWidget):
     def __init__(self):
@@ -35,6 +34,9 @@ class OptimizationWidget(QWidget):
         # Create container widgets
         self.manFiles = []
         self.autoFiles = []
+
+        # Create a threadpool
+        self.threadpool = QThreadPool()
 
         # Set up the global widget layout
         layout = QHBoxLayout(self)
@@ -61,7 +63,14 @@ class OptimizationWidget(QWidget):
         self.autoBoxLayout = QVBoxLayout()
         autoBox.setLayout(self.autoBoxLayout)
         autoLayout.addWidget(autoSelButton)
-        autoLayout.addWidget(autoBox)
+
+        # Create a scroll area for the autoBox
+        autoScroll = QScrollArea()
+        autoScroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        autoScroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        autoScroll.setWidgetResizable(True)
+        autoScroll.setWidget(autoBox)
+        autoLayout.addWidget(autoScroll)
 
         # Set alignment for both boxes
         self.manBoxLayout.setAlignment(Qt.AlignTop)
@@ -78,9 +87,19 @@ class OptimizationWidget(QWidget):
 
         # Results section
         resultBox = QGroupBox("Results")
+        resultBox.setMinimumSize(QSize(150,150))
+        resultBox.setSizePolicy(QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding))
         self.resultLayout = QVBoxLayout()
+        self.resultLayout.setAlignment(Qt.AlignTop)
         resultBox.setLayout(self.resultLayout)
-        layout.addWidget(resultBox)
+
+        # Create a scroll area for the autoBox
+        resultScroll = QScrollArea()
+        resultScroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        resultScroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        resultScroll.setWidgetResizable(True)
+        resultScroll.setWidget(resultBox)
+        layout.addWidget(resultScroll)
     
     def open_manual(self):
         """
@@ -132,20 +151,30 @@ class OptimizationWidget(QWidget):
         measurements.
         """
         erase_layout_widgets(self.resultLayout)
-        self.manFiles, self.autoFiles = get_matches_avg_line(self.manFiles, self.autoFiles, 30.0)
-        for manFile in self.manFiles:
-            for autoFile in self.autoFiles:
+        for manFile in self.manFiles.keys():
+            n=0
+            results = {}
+            for autoFile in self.autoFiles.keys():
+                n += 1
+                self.manFiles[manFile], self.autoFiles[autoFile] = get_matches_avg_center(
+                    self.manFiles[manFile], 
+                    self.autoFiles[autoFile], 
+                    30.0)
                 if PLOT_MATCHES:
                     for mf in self.manFiles[manFile]:
                         if mf['matched']:
-                            plt.plot(mf['x'], mf['y'], color='green')
+                            plt.plot(mf['x'], mf['y'], color='cyan', label="Matched manual")
                         else:
-                            plt.plot(mf['x'], mf['y'], color='red')
+                            plt.plot(mf['x'], mf['y'], color='darkblue', label="Unmatched manual")
                     for af in self.autoFiles[autoFile]:
                         if af['matched']:
-                            plt.plot(af['x'], af['y'], color='blue')
+                            plt.plot(af['x'], af['y'], color='lime', label="Matched automatic")
                         else:
-                            plt.plot(af['x'], af['y'], color='orange')
+                            plt.plot(af['x'], af['y'], color='darkgreen', label="Unmatched automatic")
+                    # Make sure labels are unique
+                    handles, labels = plt.gca().get_legend_handles_labels()
+                    dict_of_labels = dict(zip(labels, handles))
+                    plt.legend(dict_of_labels.values(), dict_of_labels.keys())
                     plt.show()
                 # Calculate matched percentages
                 mf_count = len(self.manFiles[manFile])
@@ -160,11 +189,34 @@ class OptimizationWidget(QWidget):
                         af_matched+=1
                 mf_percentage = (mf_matched/mf_count)*100
                 af_percentage = (af_matched/af_count)*100
-                print(af_matched, af_count)
-                print(mf_matched, mf_count)
+            
+                # Store the results to be sorted
+                results[os.path.basename(autoFile)] = [mf_percentage, af_percentage]
 
-                # Add the results to the resultBox
+            # Sort the results by manual for now
+            result_temp = sorted(results.items(), key=lambda file : sum(file[1]), reverse=True)
+
+            # Add the results to the resultBox
+            for result in result_temp:
                 self.resultLayout.addWidget(QLabel(
-                            os.path.basename(autoFile)+' | M: {:.2f}% | A: {:.2f}%'.format(mf_percentage, af_percentage)
+                            result[0]+' | M: {:.2f}% | A: {:.2f}%'.format(result[1][0], result[1][1])
                         ))
-    
+
+class OptimizeWorker(QRunnable):
+    def __init__(self, manFile, autoFile, maxDist, afmf):
+        """
+        """
+        super().__init__()
+
+        self.manFile = manFile
+        self.autoFile = autoFile
+        self.maxDist = maxDist
+        self.afmf = afmf
+
+    @Slot()
+    def run(self):
+        """
+        Optimize a single file.
+        """
+        manFile, autoFile = get_matches_avg_center(self.manFile, self.autoFile, self.maxDist)
+        self.afmf.append([manFile, autoFile])
