@@ -8,17 +8,16 @@ Created on Tue 8.9.22
 parameter sets compared to manual tracing.
 """
 
+from pickletools import optimize
 from PySide6.QtWidgets import (QWidget, QHBoxLayout, QGroupBox,
                             QPushButton, QVBoxLayout, QFileDialog,
                             QLabel, QScrollArea, QSizePolicy)
-from PySide6.QtCore import Qt, QSize, QRunnable, QThreadPool, Slot, QObject, Signal
+from PySide6.QtCore import Qt, QSize, QRunnable, QThreadPool, Slot
 from helper.functions import erase_layout_widgets
 from optimization.functions import (get_tracing_data, get_matches_avg_center, interpolate)
 import numpy as np
-import traceback
 import matplotlib.pyplot as plt
 import os
-import sys
 
 # Constants
 MAX_DISTANCE = 30.0
@@ -35,7 +34,6 @@ class OptimizationWidget(QWidget):
         # Create container widgets
         self.manFiles = []
         self.autoFiles = []
-        self.results = {}
 
         # Create a threadpool
         self.threadpool = QThreadPool()
@@ -98,7 +96,7 @@ class OptimizationWidget(QWidget):
         # Create a scroll area for the autoBox
         resultScroll = QScrollArea()
         resultScroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        resultScroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        resultScroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         resultScroll.setWidgetResizable(True)
         resultScroll.setWidget(resultBox)
         layout.addWidget(resultScroll)
@@ -155,49 +153,48 @@ class OptimizationWidget(QWidget):
         erase_layout_widgets(self.resultLayout)
         for manFile in self.manFiles.keys():
             n=0
-            workers={}
+            results = {}
             for autoFile in self.autoFiles.keys():
                 n += 1
-                workers[n] = OptimizeWorker(self.manFiles[manFile], manFile, self.autoFiles[autoFile], autoFile, 30.0)
-                workers[n].signals.finished.connect(lambda: self.thread_finished(workers[n].manData, workers[n].manFile, workers[n].autoData, workers[n].autoFile))
-                self.threadpool.start(workers[n])
+                self.manFiles[manFile], self.autoFiles[autoFile] = get_matches_avg_center(
+                    self.manFiles[manFile], 
+                    self.autoFiles[autoFile], 
+                    30.0)
+                if PLOT_MATCHES:
+                    for mf in self.manFiles[manFile]:
+                        if mf['matched']:
+                            plt.plot(mf['x'], mf['y'], color='cyan', label="Matched manual")
+                        else:
+                            plt.plot(mf['x'], mf['y'], color='darkblue', label="Unmatched manual")
+                    for af in self.autoFiles[autoFile]:
+                        if af['matched']:
+                            plt.plot(af['x'], af['y'], color='lime', label="Matched automatic")
+                        else:
+                            plt.plot(af['x'], af['y'], color='darkgreen', label="Unmatched automatic")
+                    # Make sure labels are unique
+                    handles, labels = plt.gca().get_legend_handles_labels()
+                    dict_of_labels = dict(zip(labels, handles))
+                    plt.legend(dict_of_labels.values(), dict_of_labels.keys())
+                    plt.show()
+                # Calculate matched percentages
+                mf_count = len(self.manFiles[manFile])
+                mf_matched = 0
+                for mf in self.manFiles[manFile]:
+                    if mf['matched']:
+                        mf_matched+=1
+                af_count = len(self.autoFiles[autoFile])
+                af_matched = 0
+                for af in self.autoFiles[autoFile]:
+                    if af['matched']:
+                        af_matched+=1
+                mf_percentage = (mf_matched/mf_count)*100
+                af_percentage = (af_matched/af_count)*100
+            
+                # Store the results to be sorted
+                results[os.path.basename(autoFile)] = [mf_percentage, af_percentage]
 
-    def thread_finished(self, manFeatures, manFile, autoFeatures, autoFile):
-        """
-        Add the AFMF to the results list
-        """
-        if PLOT_MATCHES:
-            for mf in manFeatures:
-                if mf['matched']:
-                    plt.plot(mf['x'], mf['y'], color='cyan', label="Matched manual")
-                else:
-                    plt.plot(mf['x'], mf['y'], color='darkblue', label="Unmatched manual")
-            for af in autoFeatures:
-                if af['matched']:
-                    plt.plot(af['x'], af['y'], color='lime', label="Matched automatic")
-                else:
-                    plt.plot(af['x'], af['y'], color='darkgreen', label="Unmatched automatic")
-
-        # Calculate matched percentages
-        mf_count = len(manFeatures)
-        mf_matched = 0
-        for mf in manFeatures:
-            if mf['matched']:
-                mf_matched+=1
-        af_count = len(autoFeatures)
-        af_matched = 0
-        for af in autoFeatures:
-            if af['matched']:
-                af_matched+=1
-        mf_percentage = (mf_matched/mf_count)*100
-        af_percentage = (af_matched/af_count)*100
-    
-        # Store the results to be sorted
-        self.results[os.path.basename(autoFile)] = [mf_percentage, af_percentage]
-
-        # Check if there are any more threads. If not, list all the results.
-        if self.threadpool.waitForDone():
-            result_temp = sorted(self.results.items(), key=lambda file : sum(file[1]), reverse=True)
+            # Sort the results by manual for now
+            result_temp = sorted(results.items(), key=lambda file : sum(file[1]), reverse=True)
 
             # Add the results to the resultBox
             for result in result_temp:
@@ -205,100 +202,21 @@ class OptimizationWidget(QWidget):
                             result[0]+' | M: {:.2f}% | A: {:.2f}%'.format(result[1][0], result[1][1])
                         ))
 
-        
-            #     # ^This doesn't work yet. Redesign.
-            #     if PLOT_MATCHES:
-            #         for mf in self.manFiles[manFile]:
-            #             if mf['matched']:
-            #                 plt.plot(mf['x'], mf['y'], color='cyan', label="Matched manual")
-            #             else:
-            #                 plt.plot(mf['x'], mf['y'], color='darkblue', label="Unmatched manual")
-            #         for af in self.autoFiles[autoFile]:
-            #             if af['matched']:
-            #                 plt.plot(af['x'], af['y'], color='lime', label="Matched automatic")
-            #             else:
-            #                 plt.plot(af['x'], af['y'], color='darkgreen', label="Unmatched automatic")
-            #         # Make sure labels are unique
-            #         handles, labels = plt.gca().get_legend_handles_labels()
-            #         dict_of_labels = dict(zip(labels, handles))
-            #         plt.legend(dict_of_labels.values(), dict_of_labels.keys())
-            #         plt.show()
-            #     # Calculate matched percentages
-            #     mf_count = len(self.manFiles[manFile])
-            #     mf_matched = 0
-            #     for mf in self.manFiles[manFile]:
-            #         if mf['matched']:
-            #             mf_matched+=1
-            #     af_count = len(self.autoFiles[autoFile])
-            #     af_matched = 0
-            #     for af in self.autoFiles[autoFile]:
-            #         if af['matched']:
-            #             af_matched+=1
-            #     mf_percentage = (mf_matched/mf_count)*100
-            #     af_percentage = (af_matched/af_count)*100
-            
-            #     # Store the results to be sorted
-            #     results[os.path.basename(autoFile)] = [mf_percentage, af_percentage]
-
-            # # Sort the results by manual for now
-            # result_temp = sorted(results.items(), key=lambda file : sum(file[1]), reverse=True)
-
-            # # Add the results to the resultBox
-            # for result in result_temp:
-            #     self.resultLayout.addWidget(QLabel(
-            #                 result[0]+' | M: {:.2f}% | A: {:.2f}%'.format(result[1][0], result[1][1])
-            #             ))
-
-class WorkerSignals(QObject):
-    '''
-    Defines the signals available from a running worker thread.
-
-    Supported signals are:
-
-    finished
-        No data
-
-    error
-        tuple (exctype, value, traceback.format_exc() )
-
-    result
-        object data returned from processing, anything
-
-    progress
-        int indicating % progress
-
-    '''
-    finished = Signal()
-    error = Signal(tuple)
-    result = Signal(object)
-    progress = Signal(int)
-
-
 class OptimizeWorker(QRunnable):
-    def __init__(self, manData, manFile, autoData, autoFile, maxDist):
+    def __init__(self, manFile, autoFile, maxDist, afmf):
         """
         """
         super().__init__()
 
-        self.manData = manData
         self.manFile = manFile
-        self.autoData = autoData
         self.autoFile = autoFile
         self.maxDist = maxDist
-        self.signals = WorkerSignals()
+        self.afmf = afmf
 
     @Slot()
     def run(self):
         """
-        Optimize a single file. Adapted from https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthreadpool/.
+        Optimize a single file.
         """
-        try:
-            self.manData, self.autoData = get_matches_avg_center(self.manData, self.autoData, self.maxDist)
-        except:
-            traceback.print_exc()
-            exctype, value = sys.exc_info()[:2]
-            self.signals.error.emit((exctype, value, traceback.format_exc()))
-        else:
-            self.signals.result.emit([self.manData, self.autoData])  # Return the result of the processing
-        finally:
-            self.signals.finished.emit()  # Done
+        manFile, autoFile = get_matches_avg_center(self.manFile, self.autoFile, self.maxDist)
+        self.afmf.append([manFile, autoFile])
