@@ -50,7 +50,7 @@ class Analysis:
         self.analyze_cust()
 
         # Get the length + breadth of the features
-        self.get_breadth_hires()
+        self.get_breadth_nearest()
         self.get_length()
 
         # Return the feature dictionary
@@ -93,6 +93,47 @@ class Analysis:
                         bad_keys.append(key)
                 for key in bad_keys:
                     coord.pop(key)
+
+    def get_breadth_nearest(self):
+        """
+        Get the feature breadth on a per-coordinate basis, using the nearest identified fibril edges above and below
+        the centerline. 
+        """
+        # Convert to a format that CV2 can easily recognize
+        img_data = self.img_data*325
+        img_data = img_data.astype(np.uint8)
+        
+        # Create a sharpened image, then blur it a bit to get rid of noise
+        id_sharp = processing.unsharp_mask(img_data, amount=10.0)
+        id_sharp_gauss = cv2.GaussianBlur(id_sharp, (5,5), 8.0)
+
+        # Get edges in the image
+        edges = cv2.Canny(id_sharp_gauss, threshold1=260, threshold2=280, apertureSize=7)
+
+        # Iterate over all features
+        for feature_num in self.f_data.keys():
+            feature_width = 0
+            # Get a list of all coordinates per feature
+            coords = [c['coord'] for c in self.f_data[feature_num]]
+            # dict_coord is the coordinate entry so we can reverse-index it; 
+            # coord is the actual coordinate
+            for dict_coord, coord in zip(self.f_data[feature_num], coords):
+                # Each coordinate is going to be at least 1 pixel in width (the centerline)
+                coord_width = 1
+                # Get next and previous coordinates
+                nextcoord = next((i for i, val in enumerate(coords) if np.all(val == coord)), -1)+1
+                prevcoord = next((i for i, val in enumerate(coords) if np.all(val == coord)), -1)-1
+                if nextcoord > len(coords)-1:
+                    nextcoord = len(coords)-1
+                if prevcoord < 0:
+                    prevcoord = 0
+                nextcoord = coords[nextcoord]
+                prevcoord = coords[prevcoord]
+                # Calculate the slope at the coordinate, so we can find "above" and "below" or "left" and "right"
+                dx = nextcoord[1]-prevcoord[1]
+                dy = nextcoord[0]-prevcoord[0]
+                v = np.array([dx,dy])
+
 
     def get_breadth_perpendicular(self):
         """
