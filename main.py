@@ -8,11 +8,12 @@ Created on Mon 6.27.22
 @usage: todo
 """
 
-from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QTabWidget)
+from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget)
 from preprocessing.widgets import PreprocessWidget
 from tracing.widgets import TracingWidget
 from analysis.widgets import AnalysisWidget
 from optimization.widgets import OptimizationWidget
+from timeseries.widgets import TimeseriesWidget
 from helper.widgets import HelperWidget
 
 class FeatureTracing(QApplication):
@@ -44,6 +45,7 @@ class FeatureTracing(QApplication):
             tracing = TracingWidget()
             analysis = AnalysisWidget()
             optimization = OptimizationWidget()
+            timeseries = TimeseriesWidget()
             helper = HelperWidget()
 
             # Set the analysis and tab widgets
@@ -55,7 +57,7 @@ class FeatureTracing(QApplication):
             tabs.addTab(tracing,"Tracing")
             tabs.addTab(analysis,"Analysis")
             tabs.addTab(optimization,"Optimization")
-            # tabs.addTab(label1,"Time Series")
+            tabs.addTab(timeseries,"Time Series")
             tabs.addTab(helper,"Helper functions")
 
             self.setCentralWidget(tabs)

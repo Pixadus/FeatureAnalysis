@@ -9,6 +9,7 @@ Created on Mon 6.5.22
 """
 
 import csv
+import cv2
 import os
 import sunkit_image.trace
 from astropy.io import fits

@@ -67,46 +67,53 @@ def get_tracing_data(tracing_list):
             contents[path] = features
     return(contents)
 
-def get_matches_avg_center(manFiles, autoFiles, max_distance):
+def get_matches_avg_center(manFile, autoFile, max_distance):
     """
     Get matches by matching the coordinate averages (centers-of-mass).
 
     Parameters
     ----------
-    manFiles : dict
-    autoFiles : dict
+    manFile : list
+    autoFile : list
     max_distance : float
 
     Returns
     -------
-    manFiles : dict
-    autoFiles : dict
+    manFile : list
+    autoFile : list
     """
-    for manFile in manFiles.keys():
-        for autoFile in autoFiles.keys():
-            # Iterate through manual features
-            for mf in manFiles[manFile]:
-                # Reset matches
-                mf['matched'] = False
-                closest_match = None
-                closest_distance = np.Infinity
-                # Iterate over all auto features. Look for closest match.
-                for af in autoFiles[autoFile]:
-                    if not af['matched']:
-                        mf_avgc = np.array([mf['avgx'], mf['avgy']])
-                        af_avgc = np.array([af['avgx'], af['avgy']])
-                        dist = np.linalg.norm(np.abs(mf_avgc-af_avgc))
-                        # Check if distance between two lines is within the threshold, and closest
-                        if dist <= max_distance and dist < closest_distance:
-                            closest_match = af
-                            closest_distance = dist
-                if closest_match is not None:
-                    ind = autoFiles[autoFile].index(closest_match)
-                    autoFiles[autoFile][ind]['matched'] = True
-                    mf['matched'] = True
-    return(manFiles, autoFiles)
+    # Reset matches
+    for mf in manFile:
+        mf['matched'] = False
+    # Iterate through manual features
+    for mf in manFile:
+        closest_match = None
+        closest_distance = np.Infinity
+        # Iterate over all auto features. Look for closest match.
+        for af in autoFile:
+            if not af['matched']:
+                mf_avgc = np.array([mf['avgx'], mf['avgy']])
+                af_avgc = np.array([af['avgx'], af['avgy']])
+                dist = np.linalg.norm(np.abs(mf_avgc-af_avgc))
+                # Check if distance between two lines is within the threshold, and closest
+                if dist <= max_distance and dist < closest_distance:
+                    closest_match = af
+                    closest_distance = dist
+        if closest_match is not None:
+            ind = autoFile.index(closest_match)
+            autoFile[ind]['matched'] = True
+            mf['matched'] = True
+            
+            # Plot a line connecting matching features
+            plt.plot(np.append(np.median(mf['x']), np.median(autoFile[ind]['x'])),
+                    np.append(np.median(mf['y']), np.median(autoFile[ind]['y'])),
+                    color="orange")
+            plt.scatter(np.append(np.median(mf['x']), np.median(autoFile[ind]['x'])),
+                    np.append(np.median(mf['y']), np.median(autoFile[ind]['y'])),
+                    color="orange")
+    return(manFile, autoFile)
 
-def get_matches_avg_line(manFiles, autoFiles, max_distance=30.0):
+def get_matches_avg_line(manFiles, autoFiles, max_distance=np.Infinity):
     """
     Get matches by matching on a per-pixel basis. Interpolates
     along supplied manual lines. 
@@ -158,9 +165,33 @@ def get_matches_avg_line(manFiles, autoFiles, max_distance=30.0):
                     if avg_dist < closest_distance and avg_dist <= MAX_DISTANCE:
                         closest_feature = auto_index
                         closest_distance = avg_dist
-                if closest_distance != np.Infinity:
+                if closest_distance != np.Infinity and not man_line['matched'] and not autoFiles[autoFile][closest_feature]['matched']:
                     man_line['matched'] = True
                     autoFiles[autoFile][closest_feature]['matched'] = True
+                    plt.plot(np.append(np.median(man_line['x']), np.median(autoFiles[autoFile][closest_feature]['x'])),
+                            np.append(np.median(man_line['y']), np.median(autoFiles[autoFile][closest_feature]['y'])),
+                            color="orange", label="Matching line")
+                    plt.scatter(np.append(np.median(man_line['x']), np.median(autoFiles[autoFile][closest_feature]['x'])),
+                            np.append(np.median(man_line['y']), np.median(autoFiles[autoFile][closest_feature]['y'])),
+                            color="orange")
+            for mf in manFiles[manFile]:
+                if mf['matched']:
+                    plt.plot(mf['x'], mf['y'], color='darkblue', label="Matched manual")
+                else:
+                    plt.plot(mf['x'], mf['y'], color='cyan', label="Unmatched manual")
+            for af in autoFiles[autoFile]:
+                if af['matched']:
+                    plt.plot(af['x'], af['y'], color='forestgreen', label="Matched automatic")
+                else:
+                    plt.plot(af['x'], af['y'], color='lime', label="Unmatched automatic")
+    # get legend handles and their corresponding labels
+    handles, labels = plt.gca().get_legend_handles_labels()
+    # zip labels as keys and handles as values into a dictionary, ...
+    # so only unique labels would be stored 
+    dict_of_labels = dict(zip(labels, handles))
+    # use unique labels (dict_of_labels.keys()) to generate your legend
+    plt.legend(dict_of_labels.values(), dict_of_labels.keys())
+    plt.show()
     return(manFiles, autoFiles)
 
 def interpolate(linex, liney):

@@ -50,7 +50,7 @@ class Analysis:
         self.analyze_cust()
 
         # Get the length + breadth of the features
-        self.get_breadth()
+        self.get_breadth_hires()
         self.get_length()
 
         # Return the feature dictionary
@@ -94,9 +94,9 @@ class Analysis:
                 for key in bad_keys:
                     coord.pop(key)
 
-    def get_breadth(self):
+    def get_breadth_perpendicular(self):
         """
-        Get the feature breadth on a per-coordinate basis.
+        Get the feature breadth on a per-coordinate basis, using a vector perpendicular to the local derivative. 
         """
         # Convert to a format that CV2 can easily recognize
         img_data = self.img_data*325
@@ -117,6 +117,100 @@ class Analysis:
             coords = [c['coord'] for c in self.f_data[feature_num]]
             for dict_coord, coord in zip(self.f_data[feature_num], coords):
                 # Increment the width counter
+                wctr +=1
+                # Get next and previous coordinates
+                nextcoord = next((i for i, val in enumerate(coords) if np.all(val == coord)), -1)+1
+                prevcoord = next((i for i, val in enumerate(coords) if np.all(val == coord)), -1)-1
+                if nextcoord > len(coords)-1:
+                    nextcoord = len(coords)-1
+                if prevcoord < 0:
+                    prevcoord = 0
+                nextcoord = coords[nextcoord]
+                prevcoord = coords[prevcoord]
+                # Calculate the slope at the coordinate
+                dx = nextcoord[1]-prevcoord[1]
+                dy = nextcoord[0]-prevcoord[0]
+                v = np.array([dx,dy])
+                # Get perpendicular vector
+                dp = np.empty_like(v)
+                dp[0] = -v[1]
+                dp[1] = v[0]
+                if np.isnan(dp[0]) or np.isnan(dp[1]):
+                    dict_coord['breadth'] = 0.0
+                    continue
+                # Convert to unit vector
+                mag = np.sqrt(dp[0]**2+dp[1]**2)
+                if mag == 0:
+                    dict_coord['breadth'] = 0.0
+                    continue
+                dp[0] = dp[0]/mag
+                dp[1] = dp[1]/mag
+                # Array indices must be integers, rounding
+                dp[0] = round(dp[0])
+                dp[1] = round(dp[1])
+                # Variables to store x and y displacement vectors for width visualization
+                xs = []
+                ys = []
+                # Move in positive dp until we hit a Canny-identified edge
+                bp = 0
+                coord_offset = np.array([round(coord[1]),round(coord[0])])
+                try:
+                    while edges[coord_offset[0],coord_offset[1]] == 0:
+                        bp+=1
+                        xs.append(coord_offset[0])
+                        ys.append(coord_offset[1])
+                        coord_offset[0] = coord_offset[0]+dp[0]
+                        coord_offset[1] = coord_offset[1]+dp[1]
+                    # Move in negative dp until we hit a Canny-identified edge
+                    bn = 0
+                    coord_offset = np.array([round(coord[1]),round(coord[0])])
+                    while edges[coord_offset[0],coord_offset[1]] == 0:
+                        bn+=1
+                        xs.append(coord_offset[0])
+                        ys.append(coord_offset[1])
+                        coord_offset[0] = coord_offset[0]-dp[0]
+                        coord_offset[1] = coord_offset[1]-dp[1]
+                except IndexError:
+                    pass
+                if wctr % 5 ==0:
+                    self.ax.plot(ys,xs,markersize=1,linewidth=1, color='#a09516', alpha=0.7)
+                # Add width to coord characteristics
+                dict_coord['breadth'] = bp+bn
+            # Filter through the coordinates and reject breadth outliers
+            widths_filtered = np.array([dict_coord['breadth'] for dict_coord in self.f_data[feature_num]])
+            # Using an m value of 3.5 to filter out outliers
+            # from https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm
+            # and https://stackoverflow.com/questions/11686720/is-there-a-numpy-builtin-to-reject-outliers-from-a-list
+            d = np.abs(widths_filtered - np.median(widths_filtered))
+            mdev = np.median(d)
+            s = d/mdev if mdev else 0.
+            widths_filtered = widths_filtered[s<3.5]
+            for dict_coord in self.f_data[feature_num]:
+                dict_coord = {key:val for key, val in dict_coord.items() if val in widths_filtered}
+
+    def get_breadth_triangle(self):
+        """
+        Get the feature breadth on a per-coordinate basis, using Zhang's triangle method (DOI 10.1109/TIP.2006.887731)
+        """
+        # Convert to a format that CV2 can easily recognize
+        img_data = self.img_data*325
+        img_data = img_data.astype(np.uint8)
+        
+        # Create a sharpened image, then blur it a bit to get rid of noise
+        id_sharp = processing.unsharp_mask(img_data, amount=10.0)
+        id_sharp_gauss = cv2.GaussianBlur(id_sharp, (5,5), 8.0)
+
+        # Get edges in the image
+        edges = cv2.Canny(id_sharp_gauss, threshold1=260, threshold2=280, apertureSize=7)
+
+        # Iterate over all features
+        for feature_num in self.f_data.keys():
+            # Counter to represent density of width segments
+            wctr = 0
+            # Get a list of all coordinates in feature
+            coords = [c['coord'] for c in self.f_data[feature_num]]
+            for dict_coord, coord in zip(self.f_data[feature_num], coords):
+                # Increment the width counter to account for the centerline pixel
                 wctr +=1
                 # Get next and previous coordinates
                 nextcoord = next((i for i, val in enumerate(coords) if np.all(val == coord)), -1)+1
