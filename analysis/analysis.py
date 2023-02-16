@@ -132,8 +132,51 @@ class Analysis:
                 # Calculate the slope at the coordinate, so we can find "above" and "below" or "left" and "right"
                 dx = nextcoord[1]-prevcoord[1]
                 dy = nextcoord[0]-prevcoord[0]
-                v = np.array([dx,dy])
+                if abs(dx) > 0:
+                    # Horizontal - so, we'll have an above and below
+                    self.find_nearest_edges(coord, edges)
+                elif abs(dy) > 0:
+                    # Vertical - so, we'll have a left and right
+                    self.find_nearest_edges(coord, edges)
+                else:
+                    continue
 
+    def find_nearest_edges(self, coord, edges):
+        """
+        Returns a list of the 10 nearest edges to the coordinate.
+
+        Parameters
+        ----------
+        coord : tuple
+            Format {x,y}
+        edges : list
+            Map of Canny-identified edges. 1 if edge, 0 otherwise.
+        """
+        # Create a "subsection" of the edge map around the coordinate
+        shape = self.img_data.shape
+        xbound = [np.floor(coord[0]-shape[0]/5).astype(np.int64), np.floor(coord[0]+shape[0]/5).astype(np.int64)]
+        ybound = [np.floor(coord[1]-shape[1]/5).astype(np.int64), np.floor(coord[1]+shape[1]/5).astype(np.int64)]
+        if (xbound[0] < 0):
+            xbound[0] = 0
+        if (xbound[1] > shape[0]):
+            xbound[1] = shape[0]
+        if (ybound[0] < 0):
+            ybound[0] = 0
+        if (ybound[1] > shape[0]):
+            ybound[1] = shape[1]
+        
+        edgesub = edges[xbound[0]:xbound[1], ybound[0]:ybound[1]]
+
+        # Compare distances 
+        distances = []
+        nzi = edgesub.nonzero()
+        for x,y in zip(nzi[0], nzi[1]):
+            d = np.linalg.norm(np.abs(np.asarray(coord)-np.asarray((x,y))))
+            if d < 100:
+                distances.append((d,(x,y)))
+        if len(distances) > 0:
+            distances.sort()
+            print(distances[:10],"\n")
 
     def get_breadth_perpendicular(self):
         """
