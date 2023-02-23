@@ -270,6 +270,11 @@ class EditFITSWidget(QWidget):
         resetButton.clicked.connect(self.reset_changes)
         buttonLayout.addWidget(resetButton)
 
+        # Add a save button
+        saveButton = QPushButton("Save as")
+        saveButton.clicked.connect(self.save_results)
+        sideLayout.addWidget(saveButton)
+
     def open_image(self):
         """
         Open a file browser and select an image.

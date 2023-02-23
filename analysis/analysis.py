@@ -11,6 +11,8 @@ both breadth and length, as well as optionally supplied features.
 from preprocessing import processing
 import numpy as np
 import cv2
+import sys
+import scipy
 
 class Analysis:
     def __init__(self, img_data, feature_data, axes):
@@ -50,7 +52,15 @@ class Analysis:
         self.analyze_cust()
 
         # Get the length + breadth of the features
+        # profiler = cProfile.Profile()
+        # profiler.enable()
         self.get_breadth_nearest()
+        # profiler.disable()
+        # profiler.print_stats(sort='time')
+
+        self.get_breadth_perpendicular()
+
+
         self.get_length()
 
         # Return the feature dictionary
@@ -100,19 +110,19 @@ class Analysis:
         the centerline. 
         """
         # Convert to a format that CV2 can easily recognize
-        img_data = self.img_data*325
+        img_data = self.img_data
         img_data = img_data.astype(np.uint8)
         
         # Create a sharpened image, then blur it a bit to get rid of noise
-        id_sharp = processing.unsharp_mask(img_data, amount=10.0)
+        id_sharp = processing.unsharp_mask(img_data)
         id_sharp_gauss = cv2.GaussianBlur(id_sharp, (5,5), 8.0)
 
         # Get edges in the image
-        edges = cv2.Canny(id_sharp_gauss, threshold1=260, threshold2=280, apertureSize=7)
-
+        edges = cv2.Canny(id_sharp_gauss, threshold1=100, threshold2=200, apertureSize=7)
+        total_avg_width = []
         # Iterate over all features
         for feature_num in self.f_data.keys():
-            feature_width = 0
+            feature_widths = []
             # Get a list of all coordinates per feature
             coords = [c['coord'] for c in self.f_data[feature_num]]
             # dict_coord is the coordinate entry so we can reverse-index it; 
@@ -132,14 +142,64 @@ class Analysis:
                 # Calculate the slope at the coordinate, so we can find "above" and "below" or "left" and "right"
                 dx = nextcoord[1]-prevcoord[1]
                 dy = nextcoord[0]-prevcoord[0]
-                if abs(dx) > 0:
-                    # Horizontal - so, we'll have an above and below
-                    self.find_nearest_edges(coord, edges)
-                elif abs(dy) > 0:
-                    # Vertical - so, we'll have a left and right
-                    self.find_nearest_edges(coord, edges)
-                else:
+                # Convert both dx and dy to unit vectors
+                dx = np.around(dx/np.linalg.norm(np.array([dx,dy])))
+                dy = np.around(dy/np.linalg.norm(np.array([dx,dy])))
+                nearest = self.find_nearest_edges(coord, edges)
+                try:
+                    # If we have a nonzero change in x, we'll have an "above" and "below" coordinate. 
+                    if abs(dx) > 0:
+                        # Arbitrarily pick the nearest edge as the "closest"
+                        edge_one = nearest[0]
+                        # If edge one is above the coordinate, look for edge_two below the coordinate
+                        if edge_one[2] > coord[1]:
+                            try:
+                                edge_two = [e for e in nearest if e[2] < coord[1]][0]
+                            except:
+                                edge_two = nearest[1]
+                        # If edge one is below the coordinate, look for edge_two above the coordinate
+                        elif edge_one[2] < coord[1]:
+                            try:
+                                edge_two = [e for e in nearest if e[2] > coord[1]][0]
+                            except:
+                                edge_two = nearest[1]
+                        # If edge_one[2] == coord[1], then select edge two as the second closest edge
+                        else:
+                            edge_two = nearest[1]
+                    # Otherwise, if we have a nonzero change in y, we'll have a "left" and "right" coordinate.
+                    elif abs(dy) > 0:
+                        # Arbitrarily pick the nearest edge as the closest
+                        edge_one = nearest[0]
+                        # If edge_one is right of the coordinate, look for edge_two left of the coordinate
+                        if edge_one[1] > coord[0]:
+                            # Try to get the first edge otherwise. If this fails, no edge, assign to coord. 
+                            try:
+                                edge_two = [e for e in nearest if e[1] < coord[0]][0]
+                            except IndexError:
+                                edge_two = nearest[1]
+                        # If edge_one left of the coordinate, look for edge_two right of the coordinate
+                        elif edge_one[1] < coord[0]:
+                            try:
+                                edge_two = [e for e in nearest if e[1] > coord[0]][0]
+                            except IndexError:
+                                edge_two = nearest[1]
+                        # If edge_one[1] == coord[0], select second-nearest edge as edge two
+                        else:
+                            edge_two = nearest[1]
+                    # Otherwise, if dy and dx are both zero, skip this particular coordinate
+                    else:
+                        continue
+                except IndexError:
                     continue
+
+                coord_e1 = np.array([edge_one[1], edge_one[2]])
+                coord_e2 = np.array([edge_two[1], edge_two[2]])
+                
+                self.ax.plot([coord_e1[0],coord_e2[0]], [coord_e1[1],coord_e2[1]], markersize=1,linewidth=1, color='#a09516', alpha=0.7)
+                feature_widths.append(np.linalg.norm(coord_e2-coord_e1))
+
+            total_avg_width.append(np.mean(feature_widths))
+        print(np.mean(feature_widths))
 
     def find_nearest_edges(self, coord, edges):
         """
@@ -151,11 +211,16 @@ class Analysis:
             Format {x,y}
         edges : list
             Map of Canny-identified edges. 1 if edge, 0 otherwise.
+
+        Returns
+        -------
+        nearest_edges : list
+            List of length 10, setup [(distance, (x,y)), (...)]
         """
         # Create a "subsection" of the edge map around the coordinate
-        shape = self.img_data.shape
-        xbound = [np.floor(coord[0]-shape[0]/5).astype(np.int64), np.floor(coord[0]+shape[0]/5).astype(np.int64)]
-        ybound = [np.floor(coord[1]-shape[1]/5).astype(np.int64), np.floor(coord[1]+shape[1]/5).astype(np.int64)]
+        shape = self.img_data.shape # (m, n) == (y, x)
+        xbound = [np.floor(coord[0]-shape[1]/8).astype(np.int64), np.floor(coord[0]+shape[1]/8).astype(np.int64)]
+        ybound = [np.floor(coord[1]-shape[0]/8).astype(np.int64), np.floor(coord[1]+shape[0]/8).astype(np.int64)]
         if (xbound[0] < 0):
             xbound[0] = 0
         if (xbound[1] > shape[0]):
@@ -163,20 +228,29 @@ class Analysis:
         if (ybound[0] < 0):
             ybound[0] = 0
         if (ybound[1] > shape[0]):
-            ybound[1] = shape[1]
+            ybound[1] = shape[0]
         
-        edgesub = edges[xbound[0]:xbound[1], ybound[0]:ybound[1]]
-
-        # Compare distances 
-        distances = []
-        nzi = edgesub.nonzero()
-        for x,y in zip(nzi[0], nzi[1]):
-            d = np.linalg.norm(np.abs(np.asarray(coord)-np.asarray((x,y))))
-            if d < 100:
-                distances.append((d,(x,y)))
-        if len(distances) > 0:
-            distances.sort()
-            print(distances[:10],"\n")
+        # Compare distances
+        nze = np.transpose(edges.nonzero())
+        # Select all rows where index between bounds
+        nze = nze[
+            (nze[:,0] > xbound[0]) & 
+            (nze[:,0] < xbound[1]) & 
+            (nze[:,1] > ybound[0]) &
+            (nze[:,1] < ybound[1])
+            ]
+        dist = scipy.spatial.distance.cdist(
+            nze,
+            np.array([coord])
+        )
+        # Insert the distances array to match the associated edge coordinate
+        distances = np.insert(nze, 0, dist.transpose(), axis=1)
+        # Filter out all distances greater than 20 to reduce array size (for large numbers of coordinates)
+        distances = distances[distances[:,0] < 20]
+        # Sort by distance
+        distances = distances[distances[:,0].argsort()]
+        # Return the 10 closest edges
+        return(distances[:10])
 
     def get_breadth_perpendicular(self):
         """
@@ -187,7 +261,7 @@ class Analysis:
         img_data = img_data.astype(np.uint8)
         
         # Create a sharpened image, then blur it a bit to get rid of noise
-        id_sharp = processing.unsharp_mask(img_data, amount=10.0)
+        id_sharp = processing.unsharp_mask(img_data, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0)
         id_sharp_gauss = cv2.GaussianBlur(id_sharp, (5,5), 8.0)
 
         # Get edges in the image
@@ -256,8 +330,8 @@ class Analysis:
                         coord_offset[1] = coord_offset[1]-dp[1]
                 except IndexError:
                     pass
-                if wctr % 5 ==0:
-                    self.ax.plot(ys,xs,markersize=1,linewidth=1, color='#a09516', alpha=0.7)
+                # if wctr % 5 ==0:
+                    # self.ax.plot(ys,xs,markersize=1,linewidth=1, color='#a09516', alpha=0.7)
                 # Add width to coord characteristics
                 dict_coord['breadth'] = bp+bn
             # Filter through the coordinates and reject breadth outliers
@@ -281,7 +355,7 @@ class Analysis:
         img_data = img_data.astype(np.uint8)
         
         # Create a sharpened image, then blur it a bit to get rid of noise
-        id_sharp = processing.unsharp_mask(img_data, amount=10.0)
+        id_sharp = processing.unsharp_mask(img_data, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0)
         id_sharp_gauss = cv2.GaussianBlur(id_sharp, (5,5), 8.0)
 
         # Get edges in the image
