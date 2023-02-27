@@ -11,7 +11,6 @@ both breadth and length, as well as optionally supplied features.
 from preprocessing import processing
 import numpy as np
 import cv2
-import sys
 import scipy
 
 class Analysis:
@@ -27,6 +26,8 @@ class Analysis:
             Format {f_num : [{'coord' : (x,y)}, {'coord' : (x,y)}, ... ]}
         axes : pyplot.axes
             Axes used to plot feature calculations on
+        canvas : pyplot.canvas
+            Canvas element used to refresh and redraw on
         """
         super().__init__()
 
@@ -119,6 +120,11 @@ class Analysis:
 
         # Get edges in the image
         edges = cv2.Canny(id_sharp_gauss, threshold1=100, threshold2=200, apertureSize=7)
+
+        # Combine the image and the edges and display it
+        comboimg = cv2.addWeighted(img_data, 1, edges, 0.5, 0)
+        self.ax.imshow(comboimg, origin="lower")
+
         total_avg_width = []
         # Iterate over all features
         for feature_num in self.f_data.keys():
@@ -195,7 +201,7 @@ class Analysis:
                 coord_e1 = np.array([edge_one[1], edge_one[2]])
                 coord_e2 = np.array([edge_two[1], edge_two[2]])
                 
-                self.ax.plot([coord_e1[0],coord_e2[0]], [coord_e1[1],coord_e2[1]], markersize=1,linewidth=1, color='#a09516', alpha=0.7)
+                self.ax.plot([coord_e1[0],coord_e2[0]], [coord_e1[1],coord_e2[1]], markersize=1,linewidth=1, color='red', alpha=0.7)
                 feature_widths.append(np.linalg.norm(coord_e2-coord_e1))
 
             total_avg_width.append(np.mean(feature_widths))

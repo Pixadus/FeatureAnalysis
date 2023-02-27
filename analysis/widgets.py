@@ -15,6 +15,7 @@ from matplotlib import (pyplot, colors)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from astropy.io import fits
 from analysis.analysis import Analysis
+from helper.functions import ZoomPan
 from collections import OrderedDict
 import csv
 
@@ -104,6 +105,9 @@ class AnalysisWidget(QWidget):
         self.ax = self.figure.add_axes([0,0,1,1])
         self.canvas = FigureCanvasQTAgg(self.figure)
         bottomLayout.addWidget(self.canvas)
+
+        # Add zoom and pan functionality
+        self.zp = ZoomPan(self.ax)
 
         # Set the background color of the canvas
         win_color = self.palette().color(QPalette.Window).getRgbF()
