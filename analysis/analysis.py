@@ -10,6 +10,7 @@ both breadth and length, as well as optionally supplied features.
 
 from preprocessing import processing
 import numpy as np
+np.set_printoptions(suppress=True)
 import cv2
 import scipy
 
@@ -53,12 +54,7 @@ class Analysis:
         self.analyze_cust()
 
         # Get the length + breadth of the features
-        # profiler = cProfile.Profile()
-        # profiler.enable()
         self.get_breadth_nearest()
-        # profiler.disable()
-        # profiler.print_stats(sort='time')
-
         self.get_breadth_perpendicular()
 
 
@@ -159,13 +155,36 @@ class Analysis:
                 angles = self.calculate_edge_angles(nearest, slope_angle, coord)
 
                 # Minimize the function r*tan(theta) around theta=0 and around theta=pi
-                min_func_zero = angles[angles[:,3] <= np.pi/2][:,0]*np.arctan(angles[angles[:,3] <= np.pi/2][:,3])
-                min_func_pi = angles[angles[:,3] > np.pi/2][:,0]*np.arctan(angles[angles[:,3] > np.pi/2][:,3])
+                min_func = angles[:,0]*abs(np.tan(angles[:,3]))
 
-                if len(min_func_zero) == 0:
-                    print("Zero on zero")
-                if len(min_func_pi) == 0:
-                    print("Zero on pi")
+                # Add min_func to angles
+                angles = np.insert(angles, 4, np.array(min_func).transpose(), axis=1)
+
+                # Filter arrays for values close to zero and those close to pi
+                zero_set = angles[
+                    (np.abs(angles[:,3]) <= np.pi/2) | 
+                    (np.abs(angles[:,3]) >= (3*np.pi)/2)
+                ]
+                pi_set = angles[
+                    (np.abs(angles[:,3]) > np.pi/2) & 
+                    (np.abs(angles[:,3]) < (3*np.pi)/2)
+                ]
+                try:
+                    zero_closest = zero_set[zero_set[:,4].argmin()]
+                    pi_closest = pi_set[pi_set[:,4].argmin()]
+                except ValueError:
+                    continue
+
+                self.ax.plot([zero_closest[1],pi_closest[1]],[zero_closest[2],pi_closest[2]],markersize=1,linewidth=1, color='red', alpha=0.7)
+
+                feature_widths.append(
+                    np.linalg.norm(
+                        (np.array([zero_closest[1],zero_closest[2]])-np.array([[pi_closest[1],pi_closest[2]]]))
+                    )
+                )
+            total_avg_width.append(np.mean(feature_widths))
+        print(np.mean(feature_widths))
+
     
     def calculate_edge_angles(self, nearest, slope_angle, coord):
         """
@@ -184,7 +203,7 @@ class Analysis:
 
     def find_nearest_edges(self, coord, edges):
         """
-        Returns the 50 nearest edges to the coordinate.
+        Returns the 100 nearest edges to the coordinate.
 
         Parameters
         ----------
@@ -196,7 +215,7 @@ class Analysis:
         Returns
         -------
         nearest_edges : ndarray
-            List of length 50, setup np.array([distance, edge_x, edge_y], [d,x,y], ...)
+            List of length 100, setup np.array([distance, edge_x, edge_y], [d,x,y], ...)
         """
         # Create a "subsection" of the edge map around the coordinate
         shape = self.img_data.shape # (m, n) == (y, x)
@@ -230,15 +249,15 @@ class Analysis:
         distances = distances[distances[:,0] < 20]
         # Sort by distance
         distances = distances[distances[:,0].argsort()]
-        # Return the 20 closest edges
-        return(distances[:50])
+        # Return the 100 closest edges
+        return(distances[:100])
 
     def get_breadth_perpendicular(self):
         """
         Get the feature breadth on a per-coordinate basis, using a vector perpendicular to the local derivative. 
         """
         # Convert to a format that CV2 can easily recognize
-        img_data = self.img_data*325
+        img_data = self.img_data
         img_data = img_data.astype(np.uint8)
         
         # Create a sharpened image, then blur it a bit to get rid of noise
@@ -247,6 +266,9 @@ class Analysis:
 
         # Get edges in the image
         edges = cv2.Canny(id_sharp_gauss, threshold1=260, threshold2=280, apertureSize=7)
+
+        comboimg = cv2.addWeighted(img_data, 1, edges, 0.5, 0)
+        self.ax.imshow(comboimg, origin="lower")
 
         # Iterate over all features
         for feature_num in self.f_data.keys():
@@ -312,7 +334,7 @@ class Analysis:
                 except IndexError:
                     pass
                 # if wctr % 5 ==0:
-                    # self.ax.plot(ys,xs,markersize=1,linewidth=1, color='#a09516', alpha=0.7)
+                #     self.ax.plot(ys,xs,markersize=1,linewidth=1, color='#a09516', alpha=0.7)
                 # Add width to coord characteristics
                 dict_coord['breadth'] = bp+bn
             # Filter through the coordinates and reject breadth outliers
