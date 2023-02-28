@@ -145,71 +145,46 @@ class Analysis:
                     prevcoord = 0
                 nextcoord = coords[nextcoord]
                 prevcoord = coords[prevcoord]
-                # Calculate the slope at the coordinate, so we can find "above" and "below" or "left" and "right"
+                # Calculate the slope at the coordinate
                 dx = nextcoord[1]-prevcoord[1]
                 dy = nextcoord[0]-prevcoord[0]
-                # Convert both dx and dy to unit vectors
-                dx = np.around(dx/np.linalg.norm(np.array([dx,dy])))
-                dy = np.around(dy/np.linalg.norm(np.array([dx,dy])))
+
+                # Find nearest edges to coordinate
                 nearest = self.find_nearest_edges(coord, edges)
-                try:
-                    # If we have a nonzero change in x, we'll have an "above" and "below" coordinate. 
-                    if abs(dx) > 0:
-                        # Arbitrarily pick the nearest edge as the "closest"
-                        edge_one = nearest[0]
-                        # If edge one is above the coordinate, look for edge_two below the coordinate
-                        if edge_one[2] > coord[1]:
-                            try:
-                                edge_two = [e for e in nearest if e[2] < coord[1]][0]
-                            except:
-                                edge_two = nearest[1]
-                        # If edge one is below the coordinate, look for edge_two above the coordinate
-                        elif edge_one[2] < coord[1]:
-                            try:
-                                edge_two = [e for e in nearest if e[2] > coord[1]][0]
-                            except:
-                                edge_two = nearest[1]
-                        # If edge_one[2] == coord[1], then select edge two as the second closest edge
-                        else:
-                            edge_two = nearest[1]
-                    # Otherwise, if we have a nonzero change in y, we'll have a "left" and "right" coordinate.
-                    elif abs(dy) > 0:
-                        # Arbitrarily pick the nearest edge as the closest
-                        edge_one = nearest[0]
-                        # If edge_one is right of the coordinate, look for edge_two left of the coordinate
-                        if edge_one[1] > coord[0]:
-                            # Try to get the first edge otherwise. If this fails, no edge, assign to coord. 
-                            try:
-                                edge_two = [e for e in nearest if e[1] < coord[0]][0]
-                            except IndexError:
-                                edge_two = nearest[1]
-                        # If edge_one left of the coordinate, look for edge_two right of the coordinate
-                        elif edge_one[1] < coord[0]:
-                            try:
-                                edge_two = [e for e in nearest if e[1] > coord[0]][0]
-                            except IndexError:
-                                edge_two = nearest[1]
-                        # If edge_one[1] == coord[0], select second-nearest edge as edge two
-                        else:
-                            edge_two = nearest[1]
-                    # Otherwise, if dy and dx are both zero, skip this particular coordinate
-                    else:
-                        continue
-                except IndexError:
-                    continue
-
-                coord_e1 = np.array([edge_one[1], edge_one[2]])
-                coord_e2 = np.array([edge_two[1], edge_two[2]])
                 
-                self.ax.plot([coord_e1[0],coord_e2[0]], [coord_e1[1],coord_e2[1]], markersize=1,linewidth=1, color='red', alpha=0.7)
-                feature_widths.append(np.linalg.norm(coord_e2-coord_e1))
+                # Calculate angle of the slope from horizontal
+                slope_angle = np.arctan(dy/dx)
 
-            total_avg_width.append(np.mean(feature_widths))
-        print(np.mean(feature_widths))
+                # Calculate edge angles relative to perpendicular axis of slope at coordinate
+                angles = self.calculate_edge_angles(nearest, slope_angle, coord)
+
+                # Minimize the function r*tan(theta) around theta=0 and around theta=pi
+                min_func_zero = angles[angles[:,3] <= np.pi/2][:,0]*np.arctan(angles[angles[:,3] <= np.pi/2][:,3])
+                min_func_pi = angles[angles[:,3] > np.pi/2][:,0]*np.arctan(angles[angles[:,3] > np.pi/2][:,3])
+
+                if len(min_func_zero) == 0:
+                    print("Zero on zero")
+                if len(min_func_pi) == 0:
+                    print("Zero on pi")
+    
+    def calculate_edge_angles(self, nearest, slope_angle, coord):
+        """
+        Calculates the angles to the nearest edges relative to the offset axis
+        """
+        angles = []
+        for edge in nearest:
+            edge_x = edge[1]
+            edge_y = edge[2]
+            dxp = edge_x - coord[0]
+            dyp = edge_y - coord[1]
+            theta = np.pi/2 - (np.arctan(dyp/dxp) - slope_angle)
+            angles.append(theta)
+        nearest = np.insert(nearest, 3, np.array(angles).transpose(), axis=1)
+        return(nearest)
 
     def find_nearest_edges(self, coord, edges):
         """
-        Returns a list of the 10 nearest edges to the coordinate.
+        Returns the 50 nearest edges to the coordinate.
 
         Parameters
         ----------
@@ -220,8 +195,8 @@ class Analysis:
 
         Returns
         -------
-        nearest_edges : list
-            List of length 10, setup [(distance, (x,y)), (...)]
+        nearest_edges : ndarray
+            List of length 50, setup np.array([distance, edge_x, edge_y], [d,x,y], ...)
         """
         # Create a "subsection" of the edge map around the coordinate
         shape = self.img_data.shape # (m, n) == (y, x)
@@ -237,7 +212,7 @@ class Analysis:
             ybound[1] = shape[0]
         
         # Compare distances
-        nze = np.transpose(edges.nonzero())
+        nze = np.transpose(edges.nonzero()).astype(np.double)
         # Select all rows where index between bounds
         nze = nze[
             (nze[:,0] > xbound[0]) & 
@@ -255,8 +230,8 @@ class Analysis:
         distances = distances[distances[:,0] < 20]
         # Sort by distance
         distances = distances[distances[:,0].argsort()]
-        # Return the 10 closest edges
-        return(distances[:10])
+        # Return the 20 closest edges
+        return(distances[:50])
 
     def get_breadth_perpendicular(self):
         """
