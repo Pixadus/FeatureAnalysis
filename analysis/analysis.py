@@ -169,6 +169,7 @@ class Analysis:
                     (np.abs(angles[:,3]) > np.pi/2) & 
                     (np.abs(angles[:,3]) < (3*np.pi)/2)
                 ]
+                print("Zero:", zero_set, "Pi:", pi_set)
                 
                 # Get the closest feature for zero and pi
                 try:
@@ -184,22 +185,22 @@ class Analysis:
                 # Plot every third coord to reduce plot load
                 if pctr % 3 == 0:
 
-                    # Indicate angle to all points
-                    self.ax.scatter(zero_set[:,1],zero_set[:,2],color="cyan", s=2)
-                    self.ax.scatter(pi_set[:,1],pi_set[:,2],color="pink",s=2)
+                    # # Indicate angle to all points
+                    # self.ax.scatter(zero_set[:,1],zero_set[:,2],color="cyan", s=2)
+                    # self.ax.scatter(pi_set[:,1],pi_set[:,2],color="pink",s=2)
 
-                    # self.ax.scatter(
-                    #     [zero_closest[1],coord[0],pi_closest[1]],
-                    #     [zero_closest[2],coord[1],pi_closest[2]],
-                    #     color=color, 
-                    #     alpha=1,
-                    #     s=1)
-                    # self.ax.plot(
-                    #     [zero_closest[1],coord[0],pi_closest[1]],
-                    #     [zero_closest[2],coord[1],pi_closest[2]],
-                    #     color=color, 
-                    #     alpha=1,
-                    #     markersize=1)
+                    self.ax.scatter(
+                        [zero_closest[1],coord[0],pi_closest[1]],
+                        [zero_closest[2],coord[1],pi_closest[2]],
+                        color=color, 
+                        alpha=1,
+                        s=1)
+                    self.ax.plot(
+                        [zero_closest[1],coord[0],pi_closest[1]],
+                        [zero_closest[2],coord[1],pi_closest[2]],
+                        color=color, 
+                        alpha=1,
+                        markersize=1)
                 pctr += 1
 
                 feature_widths.append(
