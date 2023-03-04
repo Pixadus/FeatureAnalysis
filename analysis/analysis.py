@@ -115,23 +115,29 @@ class Analysis:
         id_sharp_gauss = cv2.GaussianBlur(id_sharp, (5,5), 8.0)
 
         # Get edges in the image
-        edges = cv2.Canny(id_sharp_gauss, threshold1=100, threshold2=200, apertureSize=7)
+        edges = cv2.Canny(id_sharp_gauss, threshold1=100, threshold2=150, apertureSize=7)
 
         # Combine the image and the edges and display it
-        comboimg = cv2.addWeighted(img_data, 1, edges, 0.5, 0)
-        self.ax.imshow(comboimg, origin="lower")
+        imgcmp = cv2.addWeighted(img_data,1, edges,0.8,0)
+        self.ax.imshow(imgcmp, origin="lower")
 
         total_avg_width = []
         # Iterate over all features
         for feature_num in self.f_data.keys():
+            # Only show one feature - for debugging purposes
+            if len(total_avg_width) > 1:
+                continue
             feature_widths = []
+
             # Get a list of all coordinates per feature
             coords = [c['coord'] for c in self.f_data[feature_num]]
+
+            # Plot counter
+            pctr = 0
+
             # dict_coord is the coordinate entry so we can reverse-index it; 
             # coord is the actual coordinate
             for dict_coord, coord in zip(self.f_data[feature_num], coords):
-                # Each coordinate is going to be at least 1 pixel in width (the centerline)
-                coord_width = 1
                 # Get next and previous coordinates
                 nextcoord = next((i for i, val in enumerate(coords) if np.all(val == coord)), -1)+1
                 prevcoord = next((i for i, val in enumerate(coords) if np.all(val == coord)), -1)-1
@@ -142,8 +148,8 @@ class Analysis:
                 nextcoord = coords[nextcoord]
                 prevcoord = coords[prevcoord]
                 # Calculate the slope at the coordinate
-                dx = nextcoord[1]-prevcoord[1]
-                dy = nextcoord[0]-prevcoord[0]
+                dy = nextcoord[1]-prevcoord[1]
+                dx = nextcoord[0]-prevcoord[0]
 
                 # Find nearest edges to coordinate
                 nearest = self.find_nearest_edges(coord, edges)
@@ -154,12 +160,6 @@ class Analysis:
                 # Calculate edge angles relative to perpendicular axis of slope at coordinate
                 angles = self.calculate_edge_angles(nearest, slope_angle, coord)
 
-                # Minimize the function r*tan(theta) around theta=0 and around theta=pi
-                min_func = angles[:,0]*abs(np.tan(angles[:,3]))
-
-                # Add min_func to angles
-                angles = np.insert(angles, 4, np.array(min_func).transpose(), axis=1)
-
                 # Filter arrays for values close to zero and those close to pi
                 zero_set = angles[
                     (np.abs(angles[:,3]) <= np.pi/2) | 
@@ -169,13 +169,38 @@ class Analysis:
                     (np.abs(angles[:,3]) > np.pi/2) & 
                     (np.abs(angles[:,3]) < (3*np.pi)/2)
                 ]
+                
+                # Get the closest feature for zero and pi
                 try:
-                    zero_closest = zero_set[zero_set[:,4].argmin()]
-                    pi_closest = pi_set[pi_set[:,4].argmin()]
+                    zero_closest = zero_set[zero_set[:,0].argmin()]
+                    pi_closest = pi_set[pi_set[:,0].argmin()]
                 except ValueError:
                     continue
 
-                self.ax.plot([zero_closest[1],pi_closest[1]],[zero_closest[2],pi_closest[2]],markersize=1,linewidth=1, color='red', alpha=0.7)
+                # List of colors to use
+                colors = ["red","blue","green","orange","purple","black","pink","cyan"]
+                color = colors[np.random.randint(0,len(colors))]
+
+                # Plot every third coord to reduce plot load
+                if pctr % 3 == 0:
+
+                    # Indicate angle to all points
+                    self.ax.scatter(zero_set[:,1],zero_set[:,2],color="cyan", s=2)
+                    self.ax.scatter(pi_set[:,1],pi_set[:,2],color="pink",s=2)
+
+                    # self.ax.scatter(
+                    #     [zero_closest[1],coord[0],pi_closest[1]],
+                    #     [zero_closest[2],coord[1],pi_closest[2]],
+                    #     color=color, 
+                    #     alpha=1,
+                    #     s=1)
+                    # self.ax.plot(
+                    #     [zero_closest[1],coord[0],pi_closest[1]],
+                    #     [zero_closest[2],coord[1],pi_closest[2]],
+                    #     color=color, 
+                    #     alpha=1,
+                    #     markersize=1)
+                pctr += 1
 
                 feature_widths.append(
                     np.linalg.norm(
@@ -184,7 +209,6 @@ class Analysis:
                 )
             total_avg_width.append(np.mean(feature_widths))
         print(np.mean(feature_widths))
-
     
     def calculate_edge_angles(self, nearest, slope_angle, coord):
         """
@@ -219,8 +243,8 @@ class Analysis:
         """
         # Create a "subsection" of the edge map around the coordinate
         shape = self.img_data.shape # (m, n) == (y, x)
-        xbound = [np.floor(coord[0]-shape[1]/8).astype(np.int64), np.floor(coord[0]+shape[1]/8).astype(np.int64)]
-        ybound = [np.floor(coord[1]-shape[0]/8).astype(np.int64), np.floor(coord[1]+shape[0]/8).astype(np.int64)]
+        xbound = [np.floor(coord[0]-shape[1]/10).astype(np.int64), np.floor(coord[0]+shape[1]/10).astype(np.int64)]
+        ybound = [np.floor(coord[1]-shape[0]/10).astype(np.int64), np.floor(coord[1]+shape[0]/10).astype(np.int64)]
         if (xbound[0] < 0):
             xbound[0] = 0
         if (xbound[1] > shape[0]):
@@ -230,15 +254,20 @@ class Analysis:
         if (ybound[1] > shape[0]):
             ybound[1] = shape[0]
         
-        # Compare distances
+        # Compare distances. nonzero[0] is y, nonzero[1] is x
         nze = np.transpose(edges.nonzero()).astype(np.double)
+
+        # Swap columns to make x,y
+        nze[:,[0,1]] = nze[:,[1,0]]
+    
         # Select all rows where index between bounds
         nze = nze[
             (nze[:,0] > xbound[0]) & 
             (nze[:,0] < xbound[1]) & 
             (nze[:,1] > ybound[0]) &
             (nze[:,1] < ybound[1])
-            ]
+        ]
+        print("Coord: ", coord, "Bounds: ", xbound, ybound, "Nonzero arr: ", nze)
         dist = scipy.spatial.distance.cdist(
             nze,
             np.array([coord])
@@ -268,7 +297,7 @@ class Analysis:
         edges = cv2.Canny(id_sharp_gauss, threshold1=260, threshold2=280, apertureSize=7)
 
         comboimg = cv2.addWeighted(img_data, 1, edges, 0.5, 0)
-        self.ax.imshow(comboimg, origin="lower")
+        #self.ax.imshow(comboimg, origin="lower")
 
         # Iterate over all features
         for feature_num in self.f_data.keys():
