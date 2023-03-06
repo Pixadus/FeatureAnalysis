@@ -124,9 +124,6 @@ class Analysis:
         total_avg_width = []
         # Iterate over all features
         for feature_num in self.f_data.keys():
-            # Only show one feature - for debugging purposes
-            if len(total_avg_width) > 1:
-                continue
             feature_widths = []
 
             # Get a list of all coordinates per feature
@@ -162,14 +159,12 @@ class Analysis:
 
                 # Filter arrays for values close to zero and those close to pi
                 zero_set = angles[
-                    (np.abs(angles[:,3]) <= np.pi/2) | 
-                    (np.abs(angles[:,3]) >= (3*np.pi)/2)
+                    (np.cos(angles[:,3]) >= 0)
                 ]
                 pi_set = angles[
-                    (np.abs(angles[:,3]) > np.pi/2) & 
-                    (np.abs(angles[:,3]) < (3*np.pi)/2)
+                    (np.cos(angles[:,3]) < 0)
                 ]
-                print("Zero:", zero_set, "Pi:", pi_set)
+                # print("Angles", angles[:,3], "Cosines", np.cos(angles[:,3]))
                 
                 # Get the closest feature for zero and pi
                 try:
@@ -183,11 +178,11 @@ class Analysis:
                 color = colors[np.random.randint(0,len(colors))]
 
                 # Plot every third coord to reduce plot load
-                if pctr % 3 == 0:
+                if pctr % 1 == 0:
 
-                    # # Indicate angle to all points
-                    # self.ax.scatter(zero_set[:,1],zero_set[:,2],color="cyan", s=2)
-                    # self.ax.scatter(pi_set[:,1],pi_set[:,2],color="pink",s=2)
+                    # Indicate angle to all points
+                    self.ax.scatter(zero_set[:,1],zero_set[:,2],color="cyan", s=2)
+                    self.ax.scatter(pi_set[:,1],pi_set[:,2],color="pink",s=2)
 
                     self.ax.scatter(
                         [zero_closest[1],coord[0],pi_closest[1]],
@@ -222,6 +217,8 @@ class Analysis:
             dxp = edge_x - coord[0]
             dyp = edge_y - coord[1]
             theta = np.pi/2 - (np.arctan(dyp/dxp) - slope_angle)
+            if dxp < 0:
+                theta += np.pi
             angles.append(theta)
         nearest = np.insert(nearest, 3, np.array(angles).transpose(), axis=1)
         return(nearest)
@@ -268,7 +265,6 @@ class Analysis:
             (nze[:,1] > ybound[0]) &
             (nze[:,1] < ybound[1])
         ]
-        print("Coord: ", coord, "Bounds: ", xbound, ybound, "Nonzero arr: ", nze)
         dist = scipy.spatial.distance.cdist(
             nze,
             np.array([coord])
