@@ -54,6 +54,7 @@ class Analysis:
         self.analyze_cust()
 
         # Get the length + breadth of the features
+
         self.get_breadth_nearest()
         self.get_breadth_perpendicular()
 
@@ -117,6 +118,33 @@ class Analysis:
         # Get edges in the image
         edges = cv2.Canny(id_sharp_gauss, threshold1=100, threshold2=150, apertureSize=7)
 
+        # Get a list of indices where edges are nonzero
+        nze = np.transpose(edges.nonzero()).astype(np.double)
+
+        # Swap columns to make x,y
+        nze[:,[0,1]] = nze[:,[1,0]]
+
+        # Get contours on the image
+        contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Filter out all contours with a length less than 1
+        ctr_filtered = []
+        for ctr in contours:
+            if cv2.arcLength(ctr, False) > 1:
+                ctr_filtered.append(ctr)
+        
+        # Reset the contour map and draw contours on it
+        self.ctr_map = np.zeros_like(edges)
+        cv2.drawContours(
+            self.ctr_map, 
+            tuple(ctr_filtered), 
+            -1, 
+            (255,255,255), 
+            1
+        )
+
+        edges = self.ctr_map
+
         # Combine the image and the edges and display it
         imgcmp = cv2.addWeighted(img_data,1, edges,0.8,0)
         self.ax.imshow(imgcmp, origin="lower")
@@ -149,7 +177,7 @@ class Analysis:
                 dx = nextcoord[0]-prevcoord[0]
 
                 # Find nearest edges to coordinate
-                nearest = self.find_nearest_edges(coord, edges)
+                nearest = self.find_nearest_edges(coord, nze)
                 
                 # Calculate angle of the slope from horizontal
                 slope_angle = np.arctan(dy/dx)
@@ -178,18 +206,18 @@ class Analysis:
                 color = colors[np.random.randint(0,len(colors))]
 
                 # Plot every third coord to reduce plot load
-                if pctr % 1 == 0:
+                if pctr % 3 == 0:
 
-                    # Indicate angle to all points
-                    self.ax.scatter(zero_set[:,1],zero_set[:,2],color="cyan", s=2)
-                    self.ax.scatter(pi_set[:,1],pi_set[:,2],color="pink",s=2)
+                    # # Indicate angle to all points
+                    # self.ax.scatter(zero_set[:,1],zero_set[:,2],color="cyan", s=2)
+                    # self.ax.scatter(pi_set[:,1],pi_set[:,2],color="pink",s=2)
 
-                    self.ax.scatter(
-                        [zero_closest[1],coord[0],pi_closest[1]],
-                        [zero_closest[2],coord[1],pi_closest[2]],
-                        color=color, 
-                        alpha=1,
-                        s=1)
+                    # self.ax.scatter(
+                    #     [zero_closest[1],coord[0],pi_closest[1]],
+                    #     [zero_closest[2],coord[1],pi_closest[2]],
+                    #     color=color, 
+                    #     alpha=1,
+                    #     s=1)
                     self.ax.plot(
                         [zero_closest[1],coord[0],pi_closest[1]],
                         [zero_closest[2],coord[1],pi_closest[2]],
@@ -223,7 +251,7 @@ class Analysis:
         nearest = np.insert(nearest, 3, np.array(angles).transpose(), axis=1)
         return(nearest)
 
-    def find_nearest_edges(self, coord, edges):
+    def find_nearest_edges(self, coord, nze):
         """
         Returns the 100 nearest edges to the coordinate.
 
@@ -231,8 +259,8 @@ class Analysis:
         ----------
         coord : tuple
             Format {x,y}
-        edges : list
-            Map of Canny-identified edges. 1 if edge, 0 otherwise.
+        nze : tuple
+            Set x,y of array indices where edges are nonzero
 
         Returns
         -------
@@ -251,13 +279,7 @@ class Analysis:
             ybound[0] = 0
         if (ybound[1] > shape[0]):
             ybound[1] = shape[0]
-        
-        # Compare distances. nonzero[0] is y, nonzero[1] is x
-        nze = np.transpose(edges.nonzero()).astype(np.double)
-
-        # Swap columns to make x,y
-        nze[:,[0,1]] = nze[:,[1,0]]
-    
+            
         # Select all rows where index between bounds
         nze = nze[
             (nze[:,0] > xbound[0]) & 
