@@ -21,7 +21,7 @@ fig, ax = plt.subplots()
 
 # Iterate through all images on animation
 ims = []
-for i in range(120):
+for i in range(f[0].data.shape[0]):
     im = ax.imshow(f[0].data[i,:,:], animated=True, origin="lower")
     if i==0:
         ax.imshow(f[0].data[i,:,:], origin="lower")

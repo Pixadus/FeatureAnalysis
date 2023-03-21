@@ -14,6 +14,7 @@ from matplotlib import (colors, pyplot)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from astropy.io import fits
 from preprocessing import processing
+from helper.widgets import MPLImage
 
 class PreprocessWidget(QWidget):
     def __init__(self):
@@ -31,8 +32,8 @@ class PreprocessWidget(QWidget):
         layout.addLayout(imgLayout)
 
         # Create the images
-        self.baseimg = self.MPLImage("Base image")
-        self.procimg = self.MPLImage("Processed image")
+        self.baseimg = MPLImage("Base image")
+        self.procimg = MPLImage("Processed image")
         imgLayout.addWidget(self.baseimg)
         imgLayout.addWidget(QLabel("→"))
         imgLayout.addWidget(self.procimg)
@@ -169,61 +170,6 @@ class PreprocessWidget(QWidget):
 
         # set the image
         self.procimg.set_image(self.img_alt)
-
-    class MPLImage(QWidget):
-        def __init__(self, title=''):
-            """
-            Custom class for the base image.
-            """
-            super().__init__()
-
-            # Create the layout for the image
-            layout = QVBoxLayout(self)
-
-            # Add a title widget
-            self.title = QLabel(title)
-            layout.addWidget(self.title)
-
-            # Add matplotlib canvas to layout
-            self.figure = pyplot.figure()
-            self.ax = self.figure.add_axes([0,0,1,1])
-            self.canvas = FigureCanvasQTAgg(self.figure)
-            layout.addWidget(self.canvas)
-
-            # Set the background color of the canvas
-            win_color = self.palette().color(QPalette.Window).getRgbF()
-            plot_color = colors.rgb2hex(win_color)
-            self.figure.set_facecolor(plot_color)
-
-            # Hide the axes
-            self.ax.get_xaxis().set_visible(False)
-            self.ax.get_yaxis().set_visible(False)
-        
-        def set_title(self, title):
-            """
-            Sets the title of the MPLImage.
-
-            Parameters
-            ----------
-            title : str
-            """
-            self.title.setText(str(title))
-
-        def set_image(self, img):
-            """
-            Set the axes to the image and refresh canvas.
-
-            Parameters
-            ----------
-            img : ndarray
-            """
-            self.ax.cla()
-            self.ax.imshow(img, origin="lower")
-            # Refresh the canvas
-            self.ax.draw_artist(self.ax.patch)
-            self.canvas.update()
-            self.canvas.flush_events()
-            self.canvas.draw()
     
     class GSParams(QWidget):
         def __init__(self):
