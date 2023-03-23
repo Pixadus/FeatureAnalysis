@@ -491,6 +491,10 @@ class MPLImage(QWidget):
         # Hide the axes
         self.ax.get_xaxis().set_visible(False)
         self.ax.get_yaxis().set_visible(False)
+
+        # Hide title if not set to anything
+        if len(title) == 0:
+            self.title.setVisible(False)
     
     def set_title(self, title):
         """
