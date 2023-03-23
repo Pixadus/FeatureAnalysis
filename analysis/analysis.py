@@ -54,11 +54,7 @@ class Analysis:
         self.analyze_cust()
 
         # Get the length + breadth of the features
-
         self.get_breadth_nearest()
-        self.get_breadth_perpendicular()
-
-
         self.get_length()
 
         # Return the feature dictionary
@@ -226,14 +222,9 @@ class Analysis:
                         markersize=1)
                 pctr += 1
 
-                feature_widths.append(
-                    np.linalg.norm(
+                dict_coord['breadth'] =  np.linalg.norm(
                         (np.array([zero_closest[1],zero_closest[2]])-np.array([[pi_closest[1],pi_closest[2]]]))
-                    )
-                )
-            total_avg_width.append(np.mean(feature_widths))
-        print(np.mean(feature_widths))
-    
+                    )    
     def calculate_edge_angles(self, nearest, slope_angle, coord):
         """
         Calculates the angles to the nearest edges relative to the offset axis
