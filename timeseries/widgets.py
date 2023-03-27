@@ -37,6 +37,18 @@ class TimeseriesWidget(QWidget):
         controlsBox.setLayout(controlsLayout)
         leftLayout.addWidget(controlsBox)
 
+        # Add a current frame layout
+        frameLayout = QHBoxLayout()
+        controlsLayout.addLayout(frameLayout)
+
+        # Add current frame indicator
+        frameLayout.addStretch()
+        frameTextLabel = QLabel("Frame:")
+        self.frameLabel = QLabel("0")
+        frameLayout.addWidget(frameTextLabel)
+        frameLayout.addWidget(self.frameLabel)
+        frameLayout.addStretch()
+        
         # Create slider layout
         sliderLayout = QHBoxLayout()
         controlsLayout.addLayout(sliderLayout)
@@ -49,14 +61,27 @@ class TimeseriesWidget(QWidget):
         sliderLayout.addWidget(self.slider)
         sliderLayout.addWidget(self.sliderRightText)
 
+        # Add a slider signal processor
+        self.slider.valueChanged.connect(self.update_from_slider)
+
+        # Add a pause/play button 
+        self.ppButton = QPushButton("Pause/play")
+        controlsLayout.addWidget(self.ppButton)
+
         # Create sidebar layout
         sidebarLayout = QVBoxLayout()
         layout.addLayout(sidebarLayout)
 
         # Add open timeseries button to right sidebar
-        self.openTsButton = QPushButton("Open timeseries")
+        self.openTsButton = QPushButton("Open timeseries (.fits)")
         self.openTsButton.clicked.connect(self.open_timeseries)
         sidebarLayout.addWidget(self.openTsButton)
+
+        # Add button to open previous data (non-functional for now)
+        prevDataLayout = QHBoxLayout()
+        self.prevMatchesButton = QPushButton("Open previous matches")
+        prevDataLayout.addWidget(self.prevMatchesButton)
+        sidebarLayout.addLayout(prevDataLayout)
 
         # Add config group box
         configBox = QGroupBox("Config")
@@ -76,28 +101,45 @@ class TimeseriesWidget(QWidget):
         configLayout.addRow(QLabel("Analysis range:"), rangeWidget)
 
         # Check to see if the user wants to run analysis as well
-        self.analysisButton = QCheckBox()
-        self.analysisButton.setCheckState(Qt.Unchecked)
-        configLayout.addRow(QLabel("Run analysis:"), self.analysisButton)
+        self.analysisCheck = QCheckBox()
+        self.analysisCheck.setCheckState(Qt.Unchecked)
+        configLayout.addRow(QLabel("Run qualitative analysis:"), self.analysisCheck)
+
+        # Add a "Analyze timeseries" button
+        self.goTsButton = QPushButton("Analyze timeseries")
+        sidebarLayout.addWidget(self.goTsButton)
         
-        # Add button to open previous data (non-functional for now)
-        self.prevDataButton = QPushButton("Open previous data")
-        configLayout.addRow(self.prevDataButton)
-
-        # Disable everything until an image is opened
-        self.upperInput.setDisabled(True)
-        self.lowerInput.setDisabled(True)
-        self.analysisButton.setDisabled(True)
-        self.prevDataButton.setDisabled(True)
-
         # Add a data writing section 
-        saveBox = QGroupBox("Write data")
-        saveLayout = QVBoxLayout()
+        saveBox = QGroupBox("Data writing")
+        saveLayout = QHBoxLayout()
         saveBox.setLayout(saveLayout)
+        sidebarLayout.addWidget(saveBox)
 
         # Add buttons to data writing section
-        
+        self.writeMatchesBtn = QPushButton("Save matches")
+        self.writeAnalysisBtn = QPushButton("Save analysis")
+        saveLayout.addWidget(self.writeMatchesBtn)
+        saveLayout.addWidget(self.writeAnalysisBtn)
 
+        # Disable everything until an image is opened
+        self.prevMatchesButton.setDisabled(True)
+        self.upperInput.setDisabled(True)
+        self.lowerInput.setDisabled(True)
+        self.analysisCheck.setDisabled(True)
+        self.goTsButton.setDisabled(True)
+        self.writeMatchesBtn.setDisabled(True)
+        self.writeAnalysisBtn.setDisabled(True)
+        self.ppButton.setDisabled(True)
+
+        # Add a status block
+        status = QGroupBox("Status")
+        statusLayout = QVBoxLayout()
+        status.setLayout(statusLayout)
+        self.statusLabel = QLabel("")
+        statusLayout.addWidget(self.statusLabel)
+        statusLayout.addStretch()
+        sidebarLayout.addWidget(status)
+        
     def open_timeseries(self):
         """
         Open a file browser and select an image.
@@ -111,11 +153,46 @@ class TimeseriesWidget(QWidget):
         try:
             f = fits.open(image_path, ignore_missing_end=True)
             self.img_orig = f[0].data
+            self.prevMatchesButton.setDisabled(True) # Disabled until functional
+            self.upperInput.setDisabled(False)
+            self.lowerInput.setDisabled(False)
+            self.analysisCheck.setDisabled(False)
+            self.goTsButton.setDisabled(False)
+            self.ppButton.setDisabled(False)
+            self.setup_properties()
         except:
             print("Error opening image.")
             return
         self.tsimg.set_ts_index(self.img_orig,0)
         self.reset_axis()
+    
+    def update_from_slider(self):
+        """
+        Update the index and window properties with the value of the slider.
+        Normally called whenever the value of the slider changes.
+        """
+        new_index = self.slider.value()
+        self.tsimg.set_ts_index(self.img_orig,new_index)
+        self.frameLabel.setText(str(new_index))
+    
+    def setup_properties(self):
+        """
+        Gather image properties and add them to the tab. 
+        """
+        lowerBounds = 0
+        upperBounds = self.img_orig.shape[0]
+
+        # Set the values of the sidebar spinboxes
+        self.lowerInput.setMinimum(int(lowerBounds))
+        self.upperInput.setMaximum(int(upperBounds))
+        self.lowerInput.setValue(int(lowerBounds))
+        self.upperInput.setValue(int(upperBounds))
+
+        # Set slider bounds
+        self.sliderLeftText.setText(str(lowerBounds))
+        self.sliderRightText.setText(str(upperBounds))
+        self.slider.setMaximum(int(upperBounds))
+        self.slider.setSingleStep(1)
     
     def reset_axis(self):
         """

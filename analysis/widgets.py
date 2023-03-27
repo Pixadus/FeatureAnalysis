@@ -26,8 +26,6 @@ class AnalysisWidget(QWidget):
         is selected.
         """
         super().__init__()
-
-        # TODO we need a way to modify breadth params
         
         # Layout for the whole tab window
         layout = QVBoxLayout(self)

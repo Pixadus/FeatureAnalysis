@@ -55,6 +55,9 @@ class HelperWidget(QWidget):
         self.efw.setVisible(False)
         self.sfw.setVisible(False)
 
+        # Add stretch to push widgets to top
+        hfLayout.addStretch()
+
     def toggle_widget(self, widget):
         """
         Function to toggle widget to be visble.
