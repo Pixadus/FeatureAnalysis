@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (QVBoxLayout, QFileDialog, QHBoxLayout, QFormLayou
 from PySide6.QtCore import Qt
 from helper.widgets import MPLImage
 from astropy.io import fits
+from matplotlib import animation
 
 class TimeseriesWidget(QWidget):
     def __init__(self):
@@ -44,9 +45,10 @@ class TimeseriesWidget(QWidget):
         # Add current frame indicator
         frameLayout.addStretch()
         frameTextLabel = QLabel("Frame:")
-        self.frameLabel = QLabel("0")
+        self.frameSpin = QSpinBox()
+        self.frameSpin.valueChanged.connect(self.update_from_spinbox)
         frameLayout.addWidget(frameTextLabel)
-        frameLayout.addWidget(self.frameLabel)
+        frameLayout.addWidget(self.frameSpin)
         frameLayout.addStretch()
         
         # Create slider layout
@@ -64,9 +66,9 @@ class TimeseriesWidget(QWidget):
         # Add a slider signal processor
         self.slider.valueChanged.connect(self.update_from_slider)
 
-        # Add a pause/play button 
+        # Add a pause/play button (TODO)
         self.ppButton = QPushButton("Pause/play")
-        controlsLayout.addWidget(self.ppButton)
+        # controlsLayout.addWidget(self.ppButton)
 
         # Create sidebar layout
         sidebarLayout = QVBoxLayout()
@@ -130,6 +132,7 @@ class TimeseriesWidget(QWidget):
         self.writeMatchesBtn.setDisabled(True)
         self.writeAnalysisBtn.setDisabled(True)
         self.ppButton.setDisabled(True)
+        self.frameSpin.setDisabled(True)
 
         # Add a status block
         status = QGroupBox("Status")
@@ -159,6 +162,7 @@ class TimeseriesWidget(QWidget):
             self.analysisCheck.setDisabled(False)
             self.goTsButton.setDisabled(False)
             self.ppButton.setDisabled(False)
+            self.frameSpin.setDisabled(False)
             self.setup_properties()
         except:
             print("Error opening image.")
@@ -173,7 +177,16 @@ class TimeseriesWidget(QWidget):
         """
         new_index = self.slider.value()
         self.tsimg.set_ts_index(self.img_orig,new_index)
-        self.frameLabel.setText(str(new_index))
+        self.frameSpin.setValue(new_index)
+    
+    def update_from_spinbox(self):
+        """
+        Update the index and window properties with the value of the spinbox.
+        Normally called whenever the value of the spinbox changes.
+        """
+        new_index = self.frameSpin.value()
+        self.tsimg.set_ts_index(self.img_orig,new_index)
+        self.slider.setValue(new_index)
     
     def setup_properties(self):
         """
@@ -184,15 +197,15 @@ class TimeseriesWidget(QWidget):
 
         # Set the values of the sidebar spinboxes
         self.lowerInput.setMinimum(int(lowerBounds))
-        self.upperInput.setMaximum(int(upperBounds))
+        self.upperInput.setMaximum(int(upperBounds)-1)
         self.lowerInput.setValue(int(lowerBounds))
-        self.upperInput.setValue(int(upperBounds))
+        self.upperInput.setValue(int(upperBounds)-1)
 
         # Set slider bounds
         self.sliderLeftText.setText(str(lowerBounds))
-        self.sliderRightText.setText(str(upperBounds))
-        self.slider.setMaximum(int(upperBounds))
-        self.slider.setSingleStep(1)
+        self.sliderRightText.setText(str(upperBounds-1))
+        self.slider.setMaximum(int(upperBounds)-1)
+        self.frameSpin.setMaximum(int(upperBounds)-1)
     
     def reset_axis(self):
         """

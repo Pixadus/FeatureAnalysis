@@ -522,5 +522,5 @@ class MPLImage(QWidget):
         # Refresh the canvas
         self.ax.draw_artist(self.ax.patch)
         self.canvas.update()
-        self.canvas.flush_events()
+        # self.canvas.flush_events()
         self.canvas.draw()

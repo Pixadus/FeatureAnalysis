@@ -9,7 +9,6 @@ Created on Mon 6.5.22
 """
 
 import csv
-import cv2
 import os
 import sunkit_image.trace
 from astropy.io import fits
@@ -17,7 +16,7 @@ from PySide6.QtGui import (QAction, QIcon)
 from PySide6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QToolBar)
 
 class AutoTracingOCCULT:
-    def __init__(self, image_path):
+    def __init__(self, image_path="", data=None):
         """
         Autotracing class which acts as a wrapper for sunkit's OCCULT-2 implementation to 
         trace out curvilinear features on an image. 
@@ -26,18 +25,22 @@ class AutoTracingOCCULT:
 
         Parameters
         ----------
-        image_path : str
+        image_path : str (optional)
             Path to the image containing features to trace. Image must be in .fits format.
+        data : ndarray (optional)
+            Image data - useful if the image has already been opened. 
         """
-        self.path = image_path
-
-        # Test if file is a FITS file
-        if ".fits" in self.path:
-            f = fits.open(self.path, ignore_missing_end=True)
-            self.img_data = f[0].data
+        if data:
+            self.img_data = data
         else:
-            raise Exception("Did not detect .fits extension in image path.")
+            self.path = image_path
 
+            # Test if file is a FITS file
+            if ".fits" in self.path:
+                f = fits.open(self.path, ignore_missing_end=True)
+                self.img_data = f[0].data
+            else:
+                raise Exception("Did not detect .fits extension in image path.")
     
     def run(self, nsm1=4, rmin=45, lmin=35, nstruc=2000, ngap=1, qthresh1=0.0, qthresh2=3.0):
         """
