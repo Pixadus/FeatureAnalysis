@@ -287,12 +287,23 @@ class EditFITSWidget(QWidget):
         dialog.setFileMode(QFileDialog.ExistingFile)
         # Image is a tuple of (path, file_type)
         image_path = dialog.getOpenFileName(self, "Open image", filter="FITS file (*.fits)")[0]
-        # Try to open data and set graph image
+        # Check if our image has 2 dimensions or if it is a timeseries (3 dims)
         try:
             f = fits.open(image_path, ignore_missing_end=True)
+        except Exception as e:
+            print(e)
+            return
+        
+        if len(f[0].data.shape) == 2:
+            # Open the single image and set the graph data
             self.img_orig = f[0].data
-        except:
-            print("Error opening image.")
+            self.ts_img = None
+        elif len(f[0].data.shape) == 3:
+            # Open the timeseries image and set graph to 0th image
+            self.img_orig = f[0].data[0,:,:]
+            self.ts_img = f[0].data
+        else:
+            print("Error: fits data has {} dimensions, cannot manipulate".format(len(f[0].data.shape)))
             return
         
         self.reset_changes()
@@ -321,6 +332,7 @@ class EditFITSWidget(QWidget):
         self.canvas.flush_events()
         self.canvas.draw()
         self.img_alt = self.img_orig
+        self.ts_img_alt = self.ts_img
 
         # Reset summary text
         self.rotateTotal = 0
@@ -451,6 +463,120 @@ class EditFITSWidget(QWidget):
             # Reset row
             self.summLayout.removeRow(4)
             self.summLayout.insertRow(4, "Crop left:", QLabel(str(self.cropLeftTotal)))
+    
+    def apply_changes_timeseries(self):
+        """
+        Apply supplied changes to a timeseries image. 
+        """
+        # Get all the parameters from the params box
+        if self.rotateEdit.text() != '':
+            self.ts_img_alt = rotate(
+                img_as_float64(self.ts_img_alt), 
+                float(self.rotateEdit.text()),
+                resize=False
+                )
+
+            self.ts_img_alt = self.ts_img_alt[~np.all(self.ts_img_alt == 0, axis=1)]
+            bad_cols = np.argwhere(np.all(self.ts_img_alt[..., :] == 0, axis=0))
+            self.ts_img_alt = np.delete(self.ts_img_alt, bad_cols, axis=1)
+
+            # Set the image
+            self.set_image()
+
+            # Increment the counter
+            self.rotateTotal += int(self.rotateEdit.text())
+            
+            # Reset row
+            self.summLayout.removeRow(0)
+            self.summLayout.insertRow(0, "Rotate:", QLabel(str(self.rotateTotal)))
+
+        if self.cropTop.text() != '':
+            n = int(self.cropTop.text())
+            # Size is of format (rows,cols)
+            img_size = self.ts_img_alt.shape
+
+            # Remove the first n rows
+            self.ts_img_alt = np.delete(
+                self.ts_img_alt,
+                np.s_[img_size[0]-n:img_size[0]],
+                axis=0
+            )
+
+            # Set the image
+            self.set_image()
+
+            # Increment the counter
+            self.cropTopTotal += int(self.cropTop.text())
+            
+            # Reset row
+            self.summLayout.removeRow(1)
+            self.summLayout.insertRow(1, "Crop top:", QLabel(str(self.cropTopTotal)))
+        
+        if self.cropRight.text() != '':
+            n = int(self.cropRight.text())
+            # Size is of format (rows, cols)
+            img_size = self.ts_img_alt.shape
+
+            # Remove last n cols
+            self.ts_img_alt = np.delete(
+                self.ts_img_alt,
+                np.s_[img_size[1]-n:img_size[1]],
+                axis=1
+            )
+
+            # Set the image
+            self.set_image()
+
+            # Increment the counter
+            self.cropRightTotal += int(self.cropRight.text())
+            
+            # Reset row
+            self.summLayout.removeRow(2)
+            self.summLayout.insertRow(2, "Crop right:", QLabel(str(self.cropRightTotal)))
+
+        
+        if self.cropBottom.text() != '':
+            n = int(self.cropBottom.text())
+
+            # Remove the last n rows
+            self.ts_img_alt = np.delete(
+                self.ts_img_alt,
+                np.s_[0:n],
+                axis=0
+            )
+
+            # Set the image
+            self.set_image()
+
+            # Increment the counter
+            self.cropBottomTotal += int(self.cropBottom.text())
+            
+            # Reset row
+            self.summLayout.removeRow(3)
+            self.summLayout.insertRow(3, "Crop bottom:", QLabel(str(self.cropBottomTotal)))
+
+        if self.cropLeft.text() != '':
+            n = int(self.cropLeft.text())
+            # Size is of format (rows, cols)
+            img_size = self.ts_img_alt.shape
+
+            # Remove first n cols
+            self.ts_img_alt = np.delete(
+                self.ts_img_alt,
+                np.s_[0:n],
+                axis=1
+            )
+
+            # Set the image
+            self.set_image()
+
+            # Increment the counter
+            self.cropLeftTotal += int(self.cropLeft.text())
+            
+            # Reset row
+            self.summLayout.removeRow(4)
+            self.summLayout.insertRow(4, "Crop left:", QLabel(str(self.cropLeftTotal)))
+
 
     def save_results(self):
         """

@@ -82,7 +82,7 @@ class AutoTracingOCCULT:
             
         return(features)
     
-    def save(self, features, save_path):
+    def save(self, features, save_path, save_file=None):
         """
         Save features in a list to a .csv file.
 
@@ -92,15 +92,24 @@ class AutoTracingOCCULT:
             List of features and their coordinates returned by AutoTracing.run()
         save_path : str
             Path to save the .csv containing features to
+        save_file : file (optional)
+            Pass in an already-opened file to write to
         """
-
-        with open(save_path, 'w', encoding='utf8', newline='') as savefile:
+        if save_file:
             savewriter = csv.writer(savefile)
             fibril_num = 1
             for fibril in features:
                 fibril_num += 1
                 for coord in fibril:
                     savewriter.writerow([fibril_num, coord[0], coord[1]])
+        else:
+            with open(save_path, 'w', encoding='utf8', newline='') as savefile:
+                savewriter = csv.writer(savefile)
+                fibril_num = 1
+                for fibril in features:
+                    fibril_num += 1
+                    for coord in fibril:
+                        savewriter.writerow([fibril_num, coord[0], coord[1]])
     
 class ManualTrace:
     def __init__(self, image_path=""):
