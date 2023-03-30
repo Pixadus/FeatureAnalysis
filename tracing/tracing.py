@@ -30,7 +30,7 @@ class AutoTracingOCCULT:
         data : ndarray (optional)
             Image data - useful if the image has already been opened. 
         """
-        if data:
+        if data.any():
             self.img_data = data
         else:
             self.path = image_path
