@@ -2,11 +2,16 @@
 __pycache__
 */__pycache__
 
-# Ignore .sav image files
-data/images/sav/
+# Ignore image files
+data/images/*
+data/images/fits/*
+data/images/sav/*
 
 # Ignore tracing results
 data/tracing_results/*
+
+# Ignore timeseries results
+timeseries_results/
 
 # Ignore huge fits file 
 data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits

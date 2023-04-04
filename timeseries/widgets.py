@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (QVBoxLayout, QFileDialog, QHBoxLayout, QFormLayou
 from PySide6.QtCore import Qt
 from helper.widgets import MPLImage
 from astropy.io import fits
-from matplotlib import animation
+from timeseries.functions import run_analysis
 
 class TimeseriesWidget(QWidget):
     def __init__(self):
@@ -109,6 +109,9 @@ class TimeseriesWidget(QWidget):
 
         # Add a "Analyze timeseries" button
         self.goTsButton = QPushButton("Analyze timeseries")
+        self.goTsButton.clicked.connect(
+            lambda: run_analysis(self.img_orig, True)
+            )
         sidebarLayout.addWidget(self.goTsButton)
         
         # Add a data writing section 

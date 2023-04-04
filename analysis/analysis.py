@@ -15,7 +15,7 @@ import cv2
 import scipy
 
 class Analysis:
-    def __init__(self, img_data, feature_data, axes):
+    def __init__(self, img_data, feature_data, axes=None):
         """
         Looks at characteristics of features. 
 
@@ -25,16 +25,16 @@ class Analysis:
             Data of the original image used for tracing
         feature_data : OrderedDict
             Format {f_num : [{'coord' : (x,y)}, {'coord' : (x,y)}, ... ]}
-        axes : pyplot.axes
+        axes : pyplot.axes (optional)
             Axes used to plot feature calculations on
-        canvas : pyplot.canvas
-            Canvas element used to refresh and redraw on
         """
         super().__init__()
 
         # Set variables
         self.f_data = feature_data
         self.img_data = img_data
+        if len(img_data.shape) == 3:
+            self.img_data = img_data[0,:,:]
         self.ax = axes
 
     def run(self):
@@ -105,6 +105,8 @@ class Analysis:
         """
         # Convert to a format that CV2 can easily recognize
         img_data = self.img_data
+        if np.mean(img_data) < 2:
+            img_data = np.round(img_data*180)
         img_data = img_data.astype(np.uint8)
         
         # Create a sharpened image, then blur it a bit to get rid of noise
@@ -142,13 +144,12 @@ class Analysis:
         edges = self.ctr_map
 
         # Combine the image and the edges and display it
-        imgcmp = cv2.addWeighted(img_data,1, edges,0.8,0)
-        self.ax.imshow(imgcmp, origin="lower")
+        if self.ax is not None:
+            imgcmp = cv2.addWeighted(img_data,1, edges,0.8,0)
+            self.ax.imshow(imgcmp, origin="lower")
 
-        total_avg_width = []
         # Iterate over all features
         for feature_num in self.f_data.keys():
-            feature_widths = []
 
             # Get a list of all coordinates per feature
             coords = [c['coord'] for c in self.f_data[feature_num]]
@@ -159,6 +160,7 @@ class Analysis:
             # dict_coord is the coordinate entry so we can reverse-index it; 
             # coord is the actual coordinate
             for dict_coord, coord in zip(self.f_data[feature_num], coords):
+                dict_coord['breadth'] = 0
                 # Get next and previous coordinates
                 nextcoord = next((i for i, val in enumerate(coords) if np.all(val == coord)), -1)+1
                 prevcoord = next((i for i, val in enumerate(coords) if np.all(val == coord)), -1)-1
@@ -194,7 +196,7 @@ class Analysis:
                 try:
                     zero_closest = zero_set[zero_set[:,0].argmin()]
                     pi_closest = pi_set[pi_set[:,0].argmin()]
-                except ValueError:
+                except Exception as e:
                     continue
 
                 # List of colors to use
@@ -202,7 +204,16 @@ class Analysis:
                 color = colors[np.random.randint(0,len(colors))]
 
                 # Plot every third coord to reduce plot load
-                if pctr % 3 == 0:
+                if pctr % 3 == 0 and self.ax is not None:
+                    self.ax.scatter(zero_set[:,1],zero_set[:,2],color="cyan", s=2)
+                    self.ax.scatter(pi_set[:,1],pi_set[:,2],color="pink",s=2)
+
+                    self.ax.scatter(
+                        [zero_closest[1],coord[0],pi_closest[1]],
+                        [zero_closest[2],coord[1],pi_closest[2]],
+                        color=color, 
+                        alpha=1,
+                        s=1)
                     self.ax.plot(
                         [zero_closest[1],coord[0],pi_closest[1]],
                         [zero_closest[2],coord[1],pi_closest[2]],
