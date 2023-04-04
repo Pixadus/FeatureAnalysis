@@ -73,18 +73,18 @@ def get_matches_avg_center(manFile, autoFile, max_distance):
 
     Parameters
     ----------
-    manFile : list
-    autoFile : list
+    manFile : dict
+    autoFile : dict
     max_distance : float
 
     Returns
     -------
-    manFile : list
-    autoFile : list
+    manFile : dict
+    autoFile : dict
     """
     # Reset matches
     for mf in manFile:
-        mf['matched'] = False
+        mf['matched'] = None
     # Iterate through manual features
     for mf in manFile:
         closest_match = None

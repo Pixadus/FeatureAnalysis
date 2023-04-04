@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (QVBoxLayout, QFileDialog, QHBoxLayout, QFormLayou
 from PySide6.QtCore import Qt
 from helper.widgets import MPLImage
 from astropy.io import fits
-from timeseries.functions import run_analysis
+import timeseries.timeseries
 
 class TimeseriesWidget(QWidget):
     def __init__(self):
@@ -109,9 +109,7 @@ class TimeseriesWidget(QWidget):
 
         # Add a "Analyze timeseries" button
         self.goTsButton = QPushButton("Analyze timeseries")
-        self.goTsButton.clicked.connect(
-            lambda: run_analysis(self.img_orig, True)
-            )
+        self.goTsButton.clicked.connect(self.analyze_timeseries)
         sidebarLayout.addWidget(self.goTsButton)
         
         # Add a data writing section 
@@ -145,6 +143,17 @@ class TimeseriesWidget(QWidget):
         statusLayout.addWidget(self.statusLabel)
         statusLayout.addStretch()
         sidebarLayout.addWidget(status)
+    
+    def analyze_timeseries(self):
+        """
+        Run the analysis. 
+        """
+        sequence_tracings = timeseries.run_analysis(
+                self.img_orig, 
+                self.analysisCheck.isChecked(),
+                self.lowerInput.value(),
+                self.upperInput.value()
+            )
         
     def open_timeseries(self):
         """
