@@ -14,6 +14,7 @@ import glob
 import cv2
 import os
 import numpy as np
+import scipy
 from tracing.tracing import AutoTracingOCCULT
 from analysis.analysis import Analysis
 
@@ -90,12 +91,14 @@ class Timeseries():
         """
         Match features on frame 2 to frame 1, then match features on frame 3 to frame 2. 
         """
+        print("------- Matching frames -------")
         # Iterate over tracings
         for tracing in self.sequence_tracings:
             current_index = self.sequence_tracings.index(tracing)
             # Skip the initial tracing
             if current_index == 0:
                 continue
+            print("Matching frame {} to frame {}".format(current_index, current_index-1))
             # Get all coordinates in the previous frame
             if_coords = []
             for feature_id in self.sequence_tracings[current_index-1]:
@@ -114,16 +117,46 @@ class Timeseries():
                                 'x': coord['coord'][0],
                                 'y': coord['coord'][1]
                             })
+            ix = [c['x'] for c in if_coords]
+            iy = [c['y'] for c in if_coords]
+            icoords = np.transpose(np.array([ix,iy]))
+            print(len(icoords))
+            print(len(if_coords))
+            # In the current frame, iterate over all features
             for feature_id in self.sequence_tracings[current_index]:
-                for coord in 
+                # iterate over all coordinates in feature 
+                for coord in self.sequence_tracings[current_index][feature_id]:
+                    coord['match_id'] = None
+                    c = (coord['coord'][0], coord['coord'][1])
+                    dist = scipy.spatial.distance.cdist(
+                                icoords,
+                                np.array([c])
+                            )
+                    indexes = [ind for ind, item in enumerate(dist)]
+                    distind = np.insert(dist, 1, indexes, axis=1)
+                    # Only consider the distances that are less than 20 pixels away
+                    distind = distind[distind[:,0] < 20]
+                    try:
+                        min_dist = distind[np.argmin(distind[:,0])]
+                    except ValueError:
+                        continue
+                    # get the index data corresponding to the min_dist
+                    try:
+                        min_if_coord = if_coords[int(min_dist[1])]
+                    except:
+                        print("Error", min_dist[1], len(if_coords))
+                    # set the coord match to the initial frame match
+                    coord['match_id'] = min_if_coord['feature_id']
+                    coord['match_coord'] = (min_if_coord['x'], min_if_coord['y'])
+                    # remove the index from icoords to mark it as "taken"
+                    if_coords.pop(int(min_dist[1]))
+                    icoords = np.delete(icoords, (int(min_dist[1])), axis=0)
+        for frame in self.sequence_tracings:
+            for feature_id in self.sequence_tracings[self.sequence_tracings.index(frame)]:
+                print(feature_id)
+                for coord in self.sequence_tracings[self.sequence_tracings.index(frame)][feature_id]:
+                    print(coord)
 
-            # In current frame, iterate over all features
-                # iterate over all coordinates in feature
-                    # calculate the distances to frame n-1 coordinates. 
-                    # get the coordinate with the smallest distance
-                    # set frame['match_id'] to the n-1 id
-                    # set frame['match_x'] and y to the n-1 coordinate
-                    # set frame['match_dist'] to the distance
 
         
     def save_files(self):
