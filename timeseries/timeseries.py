@@ -14,11 +14,8 @@ import glob
 import cv2
 import os
 import numpy as np
-import blur_detector
-from optimization.functions import get_matches_avg_center
 from tracing.tracing import AutoTracingOCCULT
 from analysis.analysis import Analysis
-from collections import OrderedDict
 
 # Quality estimation
 
@@ -40,6 +37,7 @@ class Timeseries():
         # Variable setting
         self.full_image = full_image
         self.analyze_frames = False
+        self.save_frames = True
         self.start = 0
         self.end = full_image.shape[0]
         self.sequence_tracings = []
@@ -49,7 +47,10 @@ class Timeseries():
         """
         Run the supplied timeseries image frames through OCCULT-2.
         """
-        for frame_num in range(self.start, self.end):
+        print("------- Starting OCCULT-2 tracing -------")
+        for frame_num in range(self.start, self.end+1):
+            print("Tracing frame {}".format(frame_num))
+
             # Set up an autotracing instance
             at = AutoTracingOCCULT(data=self.full_image[frame_num,:,:])
 
@@ -58,7 +59,7 @@ class Timeseries():
 
             # Convert tracings to a dictionary
             f_num = 0
-            f_data = OrderedDict()
+            f_data = {}
             for feature in tracings:
                 f_data[f_num] = []
                 for coord in feature:
@@ -73,22 +74,67 @@ class Timeseries():
         """
         Run analysis on each OCCULT-2 tracing in sequence_tracings.
         """
+        print("------- Analyzing tracings -------")
         # Iterate over all OCCULT-2 tracings, and run analysis on them
         for tracing in self.sequence_tracings:
             tracing_index = self.sequence_tracings.index(tracing)
+            print("Analyzing frame {}".format(tracing_index))
             an = Analysis(self.full_image[tracing_index,:,:], tracing)
             an.set_opts()
             result = an.run()
             # Replace the tracing in sequence_tracing with the analyzed version
             self.sequence_tracings[tracing_index] = result
+            print(result)
+        
+    def get_matching_features(self):
+        """
+        Match features on frame 2 to frame 1, then match features on frame 3 to frame 2. 
+        """
+        # Iterate over tracings
+        for tracing in self.sequence_tracings:
+            current_index = self.sequence_tracings.index(tracing)
+            # Skip the initial tracing
+            if current_index == 0:
+                continue
+            # Get all coordinates in the previous frame
+            if_coords = []
+            for feature_id in self.sequence_tracings[current_index-1]:
+                coords = self.sequence_tracings[current_index-1][feature_id]
+                for coord in coords:
+                    if current_index-1 != 0:
+                        if coord['match_id'] is not None:
+                            if_coords.append({
+                                'feature_id':feature_id, 
+                                'x': coord['coord'][0],
+                                'y': coord['coord'][1]
+                            })
+                    else:
+                        if_coords.append({
+                                'feature_id':feature_id, 
+                                'x': coord['coord'][0],
+                                'y': coord['coord'][1]
+                            })
+            for feature_id in self.sequence_tracings[current_index]:
+                for coord in 
+
+            # In current frame, iterate over all features
+                # iterate over all coordinates in feature
+                    # calculate the distances to frame n-1 coordinates. 
+                    # get the coordinate with the smallest distance
+                    # set frame['match_id'] to the n-1 id
+                    # set frame['match_x'] and y to the n-1 coordinate
+                    # set frame['match_dist'] to the distance
+
         
     def save_files(self):
         """
         Save tracing data to the disk inside self.save_folder. 
         """
         if not os.path.exists(self.save_dir):
+            print("Creating directory {}".format(self.save_dir))
             os.mkdir(self.save_dir)
         
+        print("Saving results ...")
         for result in self.sequence_tracings:
             save_path = "{}.csv".format(self.sequence_tracings.index(result))
             with open(save_path, 'w') as outfile:

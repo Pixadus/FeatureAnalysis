@@ -8,11 +8,13 @@ Created on Fri 10.28.22
 timeseries functions. 
 """
 
-from PySide6.QtWidgets import (QVBoxLayout, QFileDialog, QHBoxLayout, QFormLayout, QWidget, QCheckBox, QGroupBox, QLabel, QSlider, QSpinBox, QPushButton)
+import csv
+import numpy as np
+from PySide6.QtWidgets import (QVBoxLayout, QFileDialog, QHBoxLayout, QFormLayout, QWidget, QCheckBox, QGroupBox, QLabel, QPlainTextEdit, QSlider, QSpinBox, QPushButton)
 from PySide6.QtCore import Qt
 from helper.widgets import MPLImage
 from astropy.io import fits
-import timeseries.timeseries
+from timeseries.timeseries import Timeseries
 
 class TimeseriesWidget(QWidget):
     def __init__(self):
@@ -81,7 +83,8 @@ class TimeseriesWidget(QWidget):
 
         # Add button to open previous data (non-functional for now)
         prevDataLayout = QHBoxLayout()
-        self.prevMatchesButton = QPushButton("Open previous matches")
+        self.prevMatchesButton = QPushButton("Open previous tracings")
+        self.prevMatchesButton.clicked.connect(self.open_previous_data)
         prevDataLayout.addWidget(self.prevMatchesButton)
         sidebarLayout.addLayout(prevDataLayout)
 
@@ -105,7 +108,12 @@ class TimeseriesWidget(QWidget):
         # Check to see if the user wants to run analysis as well
         self.analysisCheck = QCheckBox()
         self.analysisCheck.setCheckState(Qt.Unchecked)
-        configLayout.addRow(QLabel("Run qualitative analysis:"), self.analysisCheck)
+        configLayout.addRow(QLabel("Run per-frame analysis:"), self.analysisCheck)
+
+        # Add a "save" checkmark
+        self.saveCheck = QCheckBox()
+        self.saveCheck.setCheckState(Qt.Checked)
+        configLayout.addRow(QLabel("Save results to files"), self.saveCheck)
 
         # Add a "Analyze timeseries" button
         self.goTsButton = QPushButton("Analyze timeseries")
@@ -135,25 +143,27 @@ class TimeseriesWidget(QWidget):
         self.ppButton.setDisabled(True)
         self.frameSpin.setDisabled(True)
 
-        # Add a status block
-        status = QGroupBox("Status")
-        statusLayout = QVBoxLayout()
-        status.setLayout(statusLayout)
-        self.statusLabel = QLabel("")
-        statusLayout.addWidget(self.statusLabel)
-        statusLayout.addStretch()
-        sidebarLayout.addWidget(status)
+        # Add stretch to the sidebar
+        sidebarLayout.addStretch()
     
     def analyze_timeseries(self):
         """
         Run the analysis. 
         """
-        sequence_tracings = timeseries.run_analysis(
-                self.img_orig, 
-                self.analysisCheck.isChecked(),
-                self.lowerInput.value(),
-                self.upperInput.value()
-            )
+        # Set variables
+        self.ts.analyze_frames = self.analysisCheck.isChecked()
+        self.ts.save_frames = self.saveCheck.isChecked()
+        self.ts.start = self.lowerInput.value()
+        self.ts.end = self.upperInput.value()
+
+        # Start the analysis
+        self.ts.trace_images()
+        self.ts.get_matching_features()
+        if self.ts.analyze_frames:
+            self.ts.run_analysis()
+        if self.ts.save_frames:
+            self.ts.save_files()
+        print("Done!")
         
     def open_timeseries(self):
         """
@@ -168,7 +178,7 @@ class TimeseriesWidget(QWidget):
         try:
             f = fits.open(image_path, ignore_missing_end=True)
             self.img_orig = f[0].data
-            self.prevMatchesButton.setDisabled(True) # Disabled until functional
+            self.prevMatchesButton.setDisabled(False)
             self.upperInput.setDisabled(False)
             self.lowerInput.setDisabled(False)
             self.analysisCheck.setDisabled(False)
@@ -181,7 +191,70 @@ class TimeseriesWidget(QWidget):
             return
         self.tsimg.set_ts_index(self.img_orig,0)
         self.reset_axis()
+
+        # Create a timeseries instance
+        self.ts = Timeseries(self.img_orig)
     
+    def open_previous_data(self):
+        """
+        Open previous tracing/analysis data, and set self.ts.sequence_tracings to it.
+        TODO doesn't quite work yet. Finish on a day when we have a bit more time. 
+        """
+        dialog = QFileDialog()
+        # Only allow single, existing files
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        # Allow multiple
+        previous_data = dialog.getOpenFileNames(self, "Select all previous data", filter="CSV file (*.csv)")[0]
+
+        # Reset the Timeseries feature data
+        self.ts.sequence_tracings = []
+
+        # Run through files and import their contents
+        for csvlink in previous_data:
+            with open(csvlink) as datafile:
+                data = csv.reader(datafile)
+                f_num = 0
+                self.f_data = {}
+                # Initialize an empty coordinate list
+                self.f_data[f_num] = []
+                for row in data:
+                    if 'f_num' in row:
+                        continue
+                    # Only tracings
+                    if len(row) == 3:
+                        # If a coordinate in the same feature
+                        if int(row[0]) == f_num:
+                            coord = {"coord" : (float(row[1]), float(row[2]))}
+                            self.f_data[f_num].append(coord)
+                        # If a new feature
+                        else:
+                            # Set the new feature number
+                            f_num = int(row[0])
+                            coord = {"coord" : (float(row[1]), float(row[2]))}
+                            # Initialize the coordinate list, add current coord
+                            self.f_data[f_num] = [coord]
+                    # Tracings + analysis
+                    elif len(row) == 5:
+                        # If a coordinate in the same feature
+                        if int(row[0]) == f_num:
+                            coord = {
+                                "coord" : (float(row[1]), float(row[2])),
+                                "length" : float(row[3]),
+                                "breadth" : float(row[4])
+                            }
+                            self.f_data[f_num].append(coord)
+                        # If a new feature
+                        else:
+                            # Set the new feature number
+                            f_num = int(row[0])
+                            coord = {
+                                "coord" : (float(row[1]), float(row[2])),
+                                "length" : float(row[3]),
+                                "breadth" : float(row[4])
+                            }
+                            # Initialize the coordinate list, add current coord
+                            self.f_data[f_num] = [coord]
+
     def update_from_slider(self):
         """
         Update the index and window properties with the value of the slider.
