@@ -148,52 +148,6 @@ class Timeseries():
                     if_coords.pop(int(min_dist[1]))
                     icoords = np.delete(icoords, (int(min_dist[1])), axis=0)
         
-        # Write the initial frame and current frame coordinates to a file
-        print("Writing tracings 0")
-        with open("timeseries_results/0-tracings.csv", 'w') as csvfile:
-            csvwriter = csv.writer(csvfile)
-            for feature_id in self.sequence_tracings[0]:
-                for coord in self.sequence_tracings[0][feature_id]:
-                    csvwriter.writerow([
-                        feature_id,
-                        coord['coord'][0],
-                        coord['coord'][1]
-                    ])
-        print("Writing tracings 1")
-        with open("timeseries_results/1-tracings.csv", 'w') as csvfile:
-            csvwriter = csv.writer(csvfile)
-            for feature_id in self.sequence_tracings[1]:
-                for coord in self.sequence_tracings[1][feature_id]:
-                    csvwriter.writerow([
-                        feature_id,
-                        coord['coord'][0],
-                        coord['coord'][1]
-                    ])
-        print("Writing matches 1")
-        with open("timeseries_results/1-matches.csv", 'w') as csvfile:
-            csvwriter = csv.writer(csvfile)
-            for feature_id in self.sequence_tracings[1]:
-                for coord in self.sequence_tracings[1][feature_id]:
-                    if coord['match_id'] is not None:
-                        csvwriter.writerow([
-                            feature_id,
-                            coord['coord'][0],
-                            coord['coord'][1],
-                            coord['match_id'],
-                            coord['match_coord'][0],
-                            coord['match_coord'][1]
-                        ])
-                    else:
-                        csvwriter.writerow([
-                            feature_id,
-                            coord['coord'][0],
-                            coord['coord'][1],
-                            coord['match_id'],
-                            None,
-                            None
-                        ])
-
-        
     def save_files(self):
         """
         Save tracing data to the disk inside self.save_folder. 
