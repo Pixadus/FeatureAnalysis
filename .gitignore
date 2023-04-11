@@ -15,3 +15,6 @@ timeseries_results/
 
 # Ignore huge fits file 
 data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits
+
+# Ignore notes file
+notes_for_next_meeting

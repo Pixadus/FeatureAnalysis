@@ -9,9 +9,6 @@ of features over time.
 """
 
 import csv
-import re
-import glob
-import cv2
 import os
 import numpy as np
 import scipy
@@ -120,8 +117,6 @@ class Timeseries():
             ix = [c['x'] for c in if_coords]
             iy = [c['y'] for c in if_coords]
             icoords = np.transpose(np.array([ix,iy]))
-            print(len(icoords))
-            print(len(if_coords))
             # In the current frame, iterate over all features
             for feature_id in self.sequence_tracings[current_index]:
                 # iterate over all coordinates in feature 
@@ -144,6 +139,7 @@ class Timeseries():
                     try:
                         min_if_coord = if_coords[int(min_dist[1])]
                     except:
+                        continue
                         print("Error", min_dist[1], len(if_coords))
                     # set the coord match to the initial frame match
                     coord['match_id'] = min_if_coord['feature_id']
@@ -151,12 +147,51 @@ class Timeseries():
                     # remove the index from icoords to mark it as "taken"
                     if_coords.pop(int(min_dist[1]))
                     icoords = np.delete(icoords, (int(min_dist[1])), axis=0)
-        for frame in self.sequence_tracings:
-            for feature_id in self.sequence_tracings[self.sequence_tracings.index(frame)]:
-                print(feature_id)
-                for coord in self.sequence_tracings[self.sequence_tracings.index(frame)][feature_id]:
-                    print(coord)
-
+        
+        # Write the initial frame and current frame coordinates to a file
+        print("Writing tracings 0")
+        with open("timeseries_results/0-tracings.csv", 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            for feature_id in self.sequence_tracings[0]:
+                for coord in self.sequence_tracings[0][feature_id]:
+                    csvwriter.writerow([
+                        feature_id,
+                        coord['coord'][0],
+                        coord['coord'][1]
+                    ])
+        print("Writing tracings 1")
+        with open("timeseries_results/1-tracings.csv", 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            for feature_id in self.sequence_tracings[1]:
+                for coord in self.sequence_tracings[1][feature_id]:
+                    csvwriter.writerow([
+                        feature_id,
+                        coord['coord'][0],
+                        coord['coord'][1]
+                    ])
+        print("Writing matches 1")
+        with open("timeseries_results/1-matches.csv", 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            for feature_id in self.sequence_tracings[1]:
+                for coord in self.sequence_tracings[1][feature_id]:
+                    if coord['match_id'] is not None:
+                        csvwriter.writerow([
+                            feature_id,
+                            coord['coord'][0],
+                            coord['coord'][1],
+                            coord['match_id'],
+                            coord['match_coord'][0],
+                            coord['match_coord'][1]
+                        ])
+                    else:
+                        csvwriter.writerow([
+                            feature_id,
+                            coord['coord'][0],
+                            coord['coord'][1],
+                            coord['match_id'],
+                            None,
+                            None
+                        ])
 
         
     def save_files(self):
