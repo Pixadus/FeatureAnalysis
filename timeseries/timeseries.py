@@ -82,11 +82,10 @@ class Timeseries():
             result = an.run()
             # Replace the tracing in sequence_tracing with the analyzed version
             self.sequence_tracings[tracing_index] = result
-            print(result)
         
     def get_matching_features(self):
         """
-        Match features on frame 2 to frame 1, then match features on frame 3 to frame 2. 
+        Match features on frame 2 to frame 1, then features on frame 3 to frame 2, and so on.
         """
         print("------- Matching frames -------")
         # Iterate over tracings
@@ -147,6 +146,32 @@ class Timeseries():
                     # remove the index from icoords to mark it as "taken"
                     if_coords.pop(int(min_dist[1]))
                     icoords = np.delete(icoords, (int(min_dist[1])), axis=0)
+        
+        # Convert each frame data to a dict
+        new_sequence_tracings = []
+        for tracing in self.sequence_tracings:
+            current_frame = self.sequence_tracings.index(tracing)
+            if current_frame == 0:
+                continue
+            f_dict = {}
+            for feature_id in self.sequence_tracings[current_frame]:
+                f_dict[feature_id] = {
+                        "coords" : self.sequence_tracings[current_frame][feature_id],
+                        "matching_feature" : None
+                    }
+                # Create a list of match ids, and get the most common ID
+                match_ids = [coord["match_id"] for coord in f_dict[feature_id]["coords"]]
+                f_dict[feature_id]["matching_feature"] = max(set(match_ids), key=match_ids.count)
+                new_sequence_tracings.append(f_dict)
+        for trace in new_sequence_tracings:
+            current_frame = new_sequence_tracings.index(trace)
+            for feature_id in new_sequence_tracings[current_frame]:
+                print(new_sequence_tracings[current_frame][feature_id]["matching_feature"])
+
+        # self.sequence_tracings is now
+        # list(list0(f1_dict, f2_dict, f3_dict), list1(f1_dict,f2_dict,f3_dict))
+        # Our IDs from frame 0 are going to be the ones we maintain consistently - trace from 0 onwards.
+
         
     def save_files(self):
         """

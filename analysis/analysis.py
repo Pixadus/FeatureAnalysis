@@ -116,12 +116,6 @@ class Analysis:
         # Get edges in the image
         edges = cv2.Canny(id_sharp_gauss, threshold1=100, threshold2=150, apertureSize=7)
 
-        # Get a list of indices where edges are nonzero
-        nze = np.transpose(edges.nonzero()).astype(np.double)
-
-        # Swap columns to make x,y
-        nze[:,[0,1]] = nze[:,[1,0]]
-
         # Get contours on the image
         contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -142,6 +136,12 @@ class Analysis:
         )
 
         edges = self.ctr_map
+
+        # Get a list of indices where edges are nonzero
+        nze = np.transpose(edges.nonzero()).astype(np.double)
+
+        # Swap columns to make x,y
+        nze[:,[0,1]] = nze[:,[1,0]]
 
         # Combine the image and the edges and display it
         if self.ax is not None:

@@ -18,3 +18,8 @@ data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits
 
 # Ignore notes file
 notes_for_next_meeting
+
+# Ignore miscellaneous files in paper folder
+fibril_analysis_paper/fibril_paper*
+!fibril_analysis_paper/fibril_paper.pdf
+!fibril_analysis_paper/fibril_paper.tex
