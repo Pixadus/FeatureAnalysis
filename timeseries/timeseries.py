@@ -122,6 +122,7 @@ class Timeseries():
                 for coord in self.sequence_tracings[current_index][feature_id]:
                     coord['match_id'] = None
                     c = (coord['coord'][0], coord['coord'][1])
+                    # calculate distance to all prevframe coords
                     dist = scipy.spatial.distance.cdist(
                                 icoords,
                                 np.array([c])
@@ -150,10 +151,15 @@ class Timeseries():
         # Convert each frame data to a dict
         new_sequence_tracings = []
         for tracing in self.sequence_tracings:
+            f_dict = {}
             current_frame = self.sequence_tracings.index(tracing)
             if current_frame == 0:
+                for feature_id in self.sequence_tracings[current_frame]:
+                    f_dict[feature_id] = {
+                            "coords" : self.sequence_tracings[current_frame][feature_id],
+                    }
+                new_sequence_tracings.append(f_dict)
                 continue
-            f_dict = {}
             for feature_id in self.sequence_tracings[current_frame]:
                 f_dict[feature_id] = {
                         "coords" : self.sequence_tracings[current_frame][feature_id],
@@ -162,17 +168,64 @@ class Timeseries():
                 # Create a list of match ids, and get the most common ID
                 match_ids = [coord["match_id"] for coord in f_dict[feature_id]["coords"]]
                 f_dict[feature_id]["matching_feature"] = max(set(match_ids), key=match_ids.count)
-                new_sequence_tracings.append(f_dict)
-        for trace in new_sequence_tracings:
-            current_frame = new_sequence_tracings.index(trace)
-            for feature_id in new_sequence_tracings[current_frame]:
-                print(new_sequence_tracings[current_frame][feature_id]["matching_feature"])
+            new_sequence_tracings.append(f_dict)
+        # Update global format - now, looks like list(dictframe0(dictfeat1, dictfeat2))
+        self.sequence_tracings = new_sequence_tracings
 
-        # self.sequence_tracings is now
-        # list(list0(f1_dict, f2_dict, f3_dict), list1(f1_dict,f2_dict,f3_dict))
-        # Our IDs from frame 0 are going to be the ones we maintain consistently - trace from 0 onwards.
+    def follow_feature_matches(self):
+        """
+        Starting from frame 0, follow each feature down the frames
+        until either a None value is hit or the end of the frames. 
+        """
+        # Create a list to contain successful match traces
+        match_traces = []
 
-        
+        # Iterate over all frame 0 features
+        for feature_id in self.sequence_tracings[0]:
+            # Create a per-feature list of successful matches
+            feature_matches = []
+            
+            # Create a variable to store the n-1 match_id, initially holding the f0 feature_id
+            previous_match_id = feature_id
+
+            # Follow feature_id through all frame matching values. +1 to skip f0, incl.
+            for frame in range(self.start+1, self.end+1):
+                found_match = False
+                for frame_feature_id in self.sequence_tracings[frame]:
+                    # Get the matching_feature ID from the frame's feature
+                    current_match_id = self.sequence_tracings[frame][frame_feature_id]["matching_feature"]
+                    # If the matching_feature ID matches our feature ID, add coords to the list and move on
+                    if current_match_id == previous_match_id:
+                        found_match = True
+                        feature_matches.append(
+                            self.sequence_tracings[frame][frame_feature_id]["coords"]
+                        )
+                        # Update the previous_match_id for the current frame
+                        previous_match_id = frame_feature_id
+                        # Break out of frame_feature_id iteration
+                        break
+                # If we haven't found a match by the end of the frame's features, reset, break and move on
+                if found_match == False:
+                    feature_matches = []
+                    break
+                
+            # If the feature_matches list is empty, don't append and move on. Otherwise, append.
+            if len(feature_matches) == 0:
+                 continue
+            else:
+                feature_dict = {
+                    'id': feature_id,
+                    'match_coords': feature_matches
+                    }
+                match_traces.append(feature_dict)
+
+        # Diagnostics
+        for feature_dict in match_traces:
+            print(len(feature_dict['match_coords']))
+        print(len(match_traces))
+
+            
+
     def save_files(self):
         """
         Save tracing data to the disk inside self.save_folder. 

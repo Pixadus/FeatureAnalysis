@@ -159,6 +159,7 @@ class TimeseriesWidget(QWidget):
         # Start the analysis
         self.ts.trace_images()
         self.ts.get_matching_features()
+        self.ts.follow_feature_matches()
         if self.ts.analyze_frames:
             self.ts.run_analysis()
         if self.ts.save_frames:
