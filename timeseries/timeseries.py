@@ -36,9 +36,12 @@ class Timeseries():
         self.full_image = full_image
         self.analyze_frames = False
         self.save_frames = True
+        self.trace_full = False
+        self.trace_matches = True
         self.start = 0
         self.end = full_image.shape[0]
         self.sequence_tracings = []
+        self.match_tracings = []
         self.save_dir = "timeseries_results"
 
     def trace_images(self):
@@ -219,13 +222,8 @@ class Timeseries():
                     }
                 match_traces.append(feature_dict)
 
-        # Diagnostics
-        for feature_dict in match_traces:
-            print(len(feature_dict['match_coords']))
-        print(len(match_traces))
-
-            
-
+            self.match_tracings = match_traces
+    
     def save_files(self):
         """
         Save tracing data to the disk inside self.save_folder. 

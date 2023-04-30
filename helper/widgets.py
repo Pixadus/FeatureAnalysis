@@ -650,3 +650,18 @@ class MPLImage(QWidget):
         self.canvas.update()
         # self.canvas.flush_events()
         self.canvas.draw()
+    
+    def plot(self, tracings):
+        """
+        Plot the provided tracings on the axes.
+
+        Parameters
+        ----------
+        tracings : list
+            List of format [[x], [y]
+        """
+        self.ax.plot(tracings[0], tracings[1], color="blue")
+        self.ax.draw_artist(self.ax.patch)
+        self.canvas.update()
+        # self.canvas.flush_events()
+        self.canvas.draw()

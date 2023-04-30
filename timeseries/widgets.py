@@ -110,6 +110,16 @@ class TimeseriesWidget(QWidget):
         self.analysisCheck.setCheckState(Qt.Unchecked)
         configLayout.addRow(QLabel("Run per-frame analysis:"), self.analysisCheck)
 
+        # Trace out all features?
+        self.traceFullCheck = QCheckBox()
+        self.traceFullCheck.setCheckState(Qt.Unchecked)
+        configLayout.addRow(QLabel("Trace features on GUI:"), self.traceFullCheck)
+
+        # Trace out matched features?
+        self.traceMatchCheck = QCheckBox()
+        self.traceMatchCheck.setCheckState(Qt.Checked)
+        configLayout.addRow(QLabel("Trace matching features on GUI:"), self.traceMatchCheck)
+
         # Add a "save" checkmark
         self.saveCheck = QCheckBox()
         self.saveCheck.setCheckState(Qt.Checked)
@@ -137,6 +147,8 @@ class TimeseriesWidget(QWidget):
         self.upperInput.setDisabled(True)
         self.lowerInput.setDisabled(True)
         self.analysisCheck.setDisabled(True)
+        self.traceFullCheck.setDisabled(True)
+        self.traceMatchCheck.setDisabled(True)
         self.goTsButton.setDisabled(True)
         self.writeMatchesBtn.setDisabled(True)
         self.writeAnalysisBtn.setDisabled(True)
@@ -152,9 +164,16 @@ class TimeseriesWidget(QWidget):
         """
         # Set variables
         self.ts.analyze_frames = self.analysisCheck.isChecked()
+        self.ts.trace_full = self.traceFullCheck.isChecked()
+        self.ts.trace_matches = self.traceMatchCheck.isChecked()
         self.ts.save_frames = self.saveCheck.isChecked()
         self.ts.start = self.lowerInput.value()
         self.ts.end = self.upperInput.value()
+
+        # Update the frame to the min specified frame
+        self.tsimg.set_ts_index(self.img_orig,self.ts.start)
+        self.slider.setValue(self.ts.start)
+        self.frameSpin.setValue(self.ts.start)
 
         # Start the analysis
         self.ts.trace_images()
@@ -162,6 +181,10 @@ class TimeseriesWidget(QWidget):
         self.ts.follow_feature_matches()
         if self.ts.analyze_frames:
             self.ts.run_analysis()
+        if self.ts.trace_full:
+            self.ts.trace_features_full()
+        if self.ts.trace_matches:
+            self.ts.trace_feature_matches()
         if self.ts.save_frames:
             self.ts.save_files()
         print("Done!")
@@ -183,6 +206,8 @@ class TimeseriesWidget(QWidget):
             self.upperInput.setDisabled(False)
             self.lowerInput.setDisabled(False)
             self.analysisCheck.setDisabled(False)
+            self.traceFullCheck.setDisabled(False)
+            self.traceMatchCheck.setDisabled(False)
             self.goTsButton.setDisabled(False)
             self.ppButton.setDisabled(False)
             self.frameSpin.setDisabled(False)
@@ -307,5 +332,10 @@ class TimeseriesWidget(QWidget):
         """
         MPLImage subclass, with a new function.
         """
-        def set_ts_index(self, image, index):
+        def set_ts_index(self, image, index, tracings=None):
+            """
+            Update the 
+            """
             self.set_image(image[index,:,:])
+            if tracings is not None:
+                self.plot(tracings)
