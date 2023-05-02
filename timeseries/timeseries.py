@@ -224,38 +224,38 @@ class Timeseries():
 
             self.match_tracings = match_traces
     
-    def save_files(self):
-        """
-        Save tracing data to the disk inside self.save_folder. 
-        """
-        if not os.path.exists(self.save_dir):
-            print("Creating directory {}".format(self.save_dir))
-            os.mkdir(self.save_dir)
+    # def save_files(self):
+    #     """
+    #     Save tracing data to the disk inside self.save_folder. 
+    #     """
+    #     if not os.path.exists(self.save_dir):
+    #         print("Creating directory {}".format(self.save_dir))
+    #         os.mkdir(self.save_dir)
         
-        print("Saving results ...")
-        for result in self.sequence_tracings:
-            save_path = "{}.csv".format(self.sequence_tracings.index(result))
-            with open(save_path, 'w') as outfile:
-                resultwriter = csv.writer(outfile)
-                if self.analyze_frames:
-                    resultwriter.writerow(["f_num", 'x', 'y', 'length', 'breadth'])
-                    for f_num in result.keys():
-                        for coord in result[f_num]:
-                            resultwriter.writerow([
-                                f_num, 
-                                coord['coord'][0], 
-                                coord['coord'][1],
-                                coord['length'],
-                                coord['breadth']
-                                ]
-                            )
-                else:
-                    resultwriter.writerow(["f_num", 'x', 'y'])
-                    for f_num in result.keys():
-                        for coord in result[f_num]:
-                            resultwriter.writerow([
-                                f_num, 
-                                coord['coord'][0], 
-                                coord['coord'][1]
-                                ]
-                            )
+    #     print("Saving results ...")
+    #     for result in self.sequence_tracings:
+    #         save_path = "{}.csv".format(self.sequence_tracings.index(result))
+    #         with open(save_path, 'w') as outfile:
+    #             resultwriter = csv.writer(outfile)
+    #             if self.analyze_frames:
+    #                 resultwriter.writerow(["f_num", 'x', 'y', 'length', 'breadth'])
+    #                 for f_num in result.keys():
+    #                     for coord in result[f_num]:
+    #                         resultwriter.writerow([
+    #                             f_num, 
+    #                             coord['coord'][0], 
+    #                             coord['coord'][1],
+    #                             coord['length'],
+    #                             coord['breadth']
+    #                             ]
+    #                         )
+    #             else:
+    #                 resultwriter.writerow(["f_num", 'x', 'y'])
+    #                 for f_num in result.keys():
+    #                     for coord in result[f_num]:
+    #                         resultwriter.writerow([
+    #                             f_num, 
+    #                             coord['coord'][0], 
+    #                             coord['coord'][1]
+    #                             ]
+    #                         )

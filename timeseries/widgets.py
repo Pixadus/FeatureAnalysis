@@ -9,8 +9,7 @@ timeseries functions.
 """
 
 import csv
-import numpy as np
-from PySide6.QtWidgets import (QVBoxLayout, QFileDialog, QHBoxLayout, QFormLayout, QWidget, QCheckBox, QGroupBox, QLabel, QPlainTextEdit, QSlider, QSpinBox, QPushButton)
+from PySide6.QtWidgets import (QVBoxLayout, QFileDialog, QHBoxLayout, QFormLayout, QWidget, QCheckBox, QGroupBox, QLabel, QSlider, QSpinBox, QPushButton)
 from PySide6.QtCore import Qt
 from helper.widgets import MPLImage
 from astropy.io import fits
@@ -26,8 +25,8 @@ class TimeseriesWidget(QWidget):
         # Global layout
         layout = QHBoxLayout(self)
         
-        # Layout to contain image and controls
-        leftLayout = QVBoxLayout(self)
+        # Widget to contain image and controls
+        leftLayout = QVBoxLayout()
         layout.addLayout(leftLayout)
 
         # Add image
@@ -67,10 +66,6 @@ class TimeseriesWidget(QWidget):
 
         # Add a slider signal processor
         self.slider.valueChanged.connect(self.update_from_slider)
-
-        # Add a pause/play button (TODO)
-        self.ppButton = QPushButton("Pause/play")
-        # controlsLayout.addWidget(self.ppButton)
 
         # Create sidebar layout
         sidebarLayout = QVBoxLayout()
@@ -130,17 +125,33 @@ class TimeseriesWidget(QWidget):
         self.goTsButton.clicked.connect(self.analyze_timeseries)
         sidebarLayout.addWidget(self.goTsButton)
         
-        # Add a data writing section 
-        saveBox = QGroupBox("Data writing")
-        saveLayout = QHBoxLayout()
-        saveBox.setLayout(saveLayout)
-        sidebarLayout.addWidget(saveBox)
+        # Add a data writing config section 
+        writeCfgBox = QGroupBox("Data writing config")
+        writeCfgLayout = QFormLayout()
+        writeCfgBox.setLayout(writeCfgLayout)
+        sidebarLayout.addWidget(writeCfgBox)
 
-        # Add buttons to data writing section
-        self.writeMatchesBtn = QPushButton("Save matches")
-        self.writeAnalysisBtn = QPushButton("Save analysis")
-        saveLayout.addWidget(self.writeMatchesBtn)
-        saveLayout.addWidget(self.writeAnalysisBtn)
+        # Add config items
+        self.savePFLengthCheck = QCheckBox()
+        self.savePFBreadthCheck = QCheckBox()
+        self.savePFIntensityCheck = QCheckBox()
+        writeCfgLayout.addRow(QLabel("Save per-feature length:"), self.savePFLengthCheck)
+        writeCfgLayout.addRow(QLabel("Save per-feature breadth:"), self.savePFBreadthCheck)
+        writeCfgLayout.addRow(QLabel("Save per-feature intensity:"), self.savePFIntensityCheck)
+
+        # Add data writing section
+        writeBox = QGroupBox("Data writing")
+        writeLayout = QVBoxLayout()
+        writeBox.setLayout(writeLayout)
+        sidebarLayout.addWidget(writeBox)
+
+        # Add buttons to data writing section        
+        self.saveAnalysisBtn = QPushButton("Save analysis to images")
+        # TODO next time - add a function to process all matches and write to match files
+        self.saveDataBtn = QPushButton("Save raw data to CSVs")
+        # TODO next time - modify current function to save to CSV files
+        writeLayout.addWidget(self.saveAnalysisBtn)
+        writeLayout.addWidget(self.saveDataBtn)
 
         # Disable everything until an image is opened
         self.prevMatchesButton.setDisabled(True)
@@ -150,9 +161,6 @@ class TimeseriesWidget(QWidget):
         self.traceFullCheck.setDisabled(True)
         self.traceMatchCheck.setDisabled(True)
         self.goTsButton.setDisabled(True)
-        self.writeMatchesBtn.setDisabled(True)
-        self.writeAnalysisBtn.setDisabled(True)
-        self.ppButton.setDisabled(True)
         self.frameSpin.setDisabled(True)
 
         # Add stretch to the sidebar
@@ -181,8 +189,8 @@ class TimeseriesWidget(QWidget):
         self.ts.follow_feature_matches()
         if self.ts.analyze_frames:
             self.ts.run_analysis()
-        if self.ts.save_frames:
-            self.ts.save_files()
+        # if self.ts.save_frames:
+            # self.ts.save_files()
         print("Done!")
         
     def open_timeseries(self):
@@ -205,7 +213,6 @@ class TimeseriesWidget(QWidget):
             self.traceFullCheck.setDisabled(False)
             self.traceMatchCheck.setDisabled(False)
             self.goTsButton.setDisabled(False)
-            self.ppButton.setDisabled(False)
             self.frameSpin.setDisabled(False)
             self.setup_properties()
         except:
