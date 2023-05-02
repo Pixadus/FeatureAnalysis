@@ -171,7 +171,7 @@ class TimeseriesWidget(QWidget):
         self.ts.end = self.upperInput.value()
 
         # Update the frame to the min specified frame
-        self.tsimg.set_ts_index(self.img_orig,self.ts.start)
+        self.tsimg.set_ts_index(self.img_orig,self.ts.start,self.ts)
         self.slider.setValue(self.ts.start)
         self.frameSpin.setValue(self.ts.start)
 
@@ -181,10 +181,6 @@ class TimeseriesWidget(QWidget):
         self.ts.follow_feature_matches()
         if self.ts.analyze_frames:
             self.ts.run_analysis()
-        if self.ts.trace_full:
-            self.ts.trace_features_full()
-        if self.ts.trace_matches:
-            self.ts.trace_feature_matches()
         if self.ts.save_frames:
             self.ts.save_files()
         print("Done!")
@@ -215,11 +211,13 @@ class TimeseriesWidget(QWidget):
         except:
             print("Error opening image.")
             return
-        self.tsimg.set_ts_index(self.img_orig,0)
-        self.reset_axis()
 
         # Create a timeseries instance
         self.ts = Timeseries(self.img_orig)
+
+        # Set the index
+        self.tsimg.set_ts_index(self.img_orig,0,self.ts)
+        self.reset_axis()
     
     def open_previous_data(self):
         """
@@ -287,7 +285,7 @@ class TimeseriesWidget(QWidget):
         Normally called whenever the value of the slider changes.
         """
         new_index = self.slider.value()
-        self.tsimg.set_ts_index(self.img_orig,new_index)
+        self.tsimg.set_ts_index(self.img_orig,new_index,self.ts)
         self.frameSpin.setValue(new_index)
     
     def update_from_spinbox(self):
@@ -296,7 +294,7 @@ class TimeseriesWidget(QWidget):
         Normally called whenever the value of the spinbox changes.
         """
         new_index = self.frameSpin.value()
-        self.tsimg.set_ts_index(self.img_orig,new_index)
+        self.tsimg.set_ts_index(self.img_orig,new_index,self.ts)
         self.slider.setValue(new_index)
     
     def setup_properties(self):
@@ -332,10 +330,47 @@ class TimeseriesWidget(QWidget):
         """
         MPLImage subclass, with a new function.
         """
-        def set_ts_index(self, image, index, tracings=None):
+        def set_ts_index(self, image, index, timeseries):
             """
-            Update the 
+            Update the image, with tracings if provided.
+
+            Parameters
+            ----------
+            image : 3D numpy array
+            index : image.shape[0] index
+            timeseries : Timeseries class
             """
             self.set_image(image[index,:,:])
-            if tracings is not None:
-                self.plot(tracings)
+            
+            # Only trace out features if enabled, and the analysis has been run
+            if timeseries.trace_full and len(timeseries.sequence_tracings) > 0 and index <= timeseries.end:
+                seq_index = timeseries.start - index
+                
+                # Separate lines with None as indicated in https://exnumerus.blogspot.com/2011/02/how-to-quickly-plot-multiple-line.html.
+                xs = []
+                ys = []
+                for feature_id, values in timeseries.sequence_tracings[seq_index].items():
+                    coords = values["coords"]
+                    x = [coord["coord"][0] for coord in coords]
+                    y = [coord["coord"][1] for coord in coords]
+                    xs.extend(x)
+                    ys.extend(y)
+                    xs.append(None)
+                    ys.append(None)
+                self.plot([xs,ys])
+            if timeseries.trace_matches and len(timeseries.match_tracings) > 0 and index <= timeseries.end:
+                match_index = timeseries.start - index
+
+                # Matches are set up like [{'id': 0, 'match_coords': [values["coords"], values["coords"]]}]
+                # with the 'match_coords' list as the length from start to end. Our index is in here.
+                xs = []
+                ys = []
+                for match_sequence in timeseries.match_tracings:
+                    coords = match_sequence["match_coords"][match_index]
+                    x = [coord["coord"][0] for coord in coords]
+                    y = [coord["coord"][1] for coord in coords]
+                    xs.extend(x)
+                    ys.extend(y)
+                    xs.append(None)
+                    ys.append(None)
+                self.plot([xs,ys], color="red")

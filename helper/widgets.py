@@ -651,7 +651,7 @@ class MPLImage(QWidget):
         # self.canvas.flush_events()
         self.canvas.draw()
     
-    def plot(self, tracings):
+    def plot(self, tracings, color = 'blue'):
         """
         Plot the provided tracings on the axes.
 
@@ -659,8 +659,10 @@ class MPLImage(QWidget):
         ----------
         tracings : list
             List of format [[x], [y]
+        color : String (optional)
+            color to plot in
         """
-        self.ax.plot(tracings[0], tracings[1], color="blue")
+        self.ax.plot(tracings[0], tracings[1], color=color)
         self.ax.draw_artist(self.ax.patch)
         self.canvas.update()
         # self.canvas.flush_events()
