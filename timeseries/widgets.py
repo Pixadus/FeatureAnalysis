@@ -135,9 +135,15 @@ class TimeseriesWidget(QWidget):
         self.savePFLengthCheck = QCheckBox()
         self.savePFBreadthCheck = QCheckBox()
         self.savePFIntensityCheck = QCheckBox()
+        self.savePFLengthCheck.setChecked(True)
+        self.savePFBreadthCheck.setChecked(True)
+        self.savePFIntensityCheck.setChecked(True)
         writeCfgLayout.addRow(QLabel("Save per-feature length:"), self.savePFLengthCheck)
         writeCfgLayout.addRow(QLabel("Save per-feature breadth:"), self.savePFBreadthCheck)
         writeCfgLayout.addRow(QLabel("Save per-feature intensity:"), self.savePFIntensityCheck)
+
+        # Disable intensitycheck until functionality added TODO
+        self.savePFIntensityCheck.setDisabled(True)
 
         # Add data writing section
         writeBox = QGroupBox("Data writing")
@@ -147,7 +153,7 @@ class TimeseriesWidget(QWidget):
 
         # Add buttons to data writing section        
         self.saveAnalysisBtn = QPushButton("Save analysis to images")
-        # TODO next time - add a function to process all matches and write to match files
+        self.saveAnalysisBtn.clicked.connect(lambda: self.ts.save_match_analysis(self.savePFLengthCheck.isChecked(), self.savePFBreadthCheck.isChecked(), self.savePFIntensityCheck.isChecked()))
         self.saveDataBtn = QPushButton("Save raw data to CSVs")
         # TODO next time - modify current function to save to CSV files
         writeLayout.addWidget(self.saveAnalysisBtn)
@@ -185,10 +191,10 @@ class TimeseriesWidget(QWidget):
 
         # Start the analysis
         self.ts.trace_images()
-        self.ts.get_matching_features()
-        self.ts.follow_feature_matches()
         if self.ts.analyze_frames:
             self.ts.run_analysis()
+        self.ts.get_matching_features()
+        self.ts.follow_feature_matches()
         # if self.ts.save_frames:
             # self.ts.save_files()
         print("Done!")

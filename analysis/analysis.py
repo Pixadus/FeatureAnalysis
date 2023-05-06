@@ -100,8 +100,8 @@ class Analysis:
 
     def get_breadth_nearest(self):
         """
-        Get the feature breadth on a per-coordinate basis, using the nearest identified fibril edges above and below
-        the centerline. 
+        Get the feature breadth on a per-coordinate basis, using the 
+        nearest identified fibril edges above and below the centerline. 
         """
         # Convert to a format that CV2 can easily recognize
         img_data = self.img_data
@@ -134,7 +134,6 @@ class Analysis:
             (255,255,255), 
             1
         )
-
         edges = self.ctr_map
 
         # Get a list of indices where edges are nonzero

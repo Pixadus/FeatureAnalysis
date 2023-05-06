@@ -8,10 +8,11 @@ Created on Fri 10.28.22
 of features over time.
 """
 
-import csv
-import os
 import numpy as np
 import scipy
+import glob
+import os
+from matplotlib import pyplot as plt
 from tracing.tracing import AutoTracingOCCULT
 from analysis.analysis import Analysis
 
@@ -224,6 +225,69 @@ class Timeseries():
 
             self.match_tracings = match_traces
     
+    def save_match_analysis(self, length=True, breadth=True, intensity=False):
+        """
+        Save individual match analyses to image files. 
+        """
+        print("------- Saving match data -------")
+
+        # Remove all in timeseries_results/analysis first
+        files = glob.glob('timeseries_results/analysis/*')
+        for f in files:
+            os.remove(f)
+
+        # Iterate over all matched features
+        for match in self.match_tracings:
+            # Variable definitions
+            match_id = match["id"]
+            lengths = []
+            breadths = []
+
+            # Start per-feature coordinate iteration
+            for frame in match["match_coords"]:
+                # Add length to lengths
+                print(frame[-1])
+                len = frame[-1]["length"]
+                lengths.append(len)
+
+                # Average out breadths and append to list
+                avg_breadth = np.mean([coord["breadth"] for coord in frame])
+                breadths.append(avg_breadth)
+            
+            # Create matplotlib subplots
+            pltcnt = []
+            if length:
+                pltcnt.append('length')
+            if breadth:
+                pltcnt.append('breadth')
+            if intensity:
+                pltcnt.append('intensity')
+            fig, ax = plt.subplots(len(pltcnt))
+
+            # Lengths
+            if length:
+                ind = pltcnt.index('length')
+                ax[ind].plot(lengths, color="blue")
+                ax[ind].set_title("Lengths for frame {}".format(match_id))
+
+            # Breadths
+            if breadth:
+                ind = pltcnt.index('breadth')
+                ax[ind].plot(breadths, color="blue")
+                ax[ind].set_title("Breadths for frame {}".format(match_id))
+            
+            # Intensity
+            if intensity:
+                ind = pltcnt.index('intensity')
+                # TODO
+
+            # Save to timeseries_results/analysis/
+            if pltcnt > 0:
+                fig.savefig('timeseries_results/analysis/{}.png'.format(match_id))
+        
+        # Done!
+        print("Saved analysis figures.")
+
     # def save_files(self):
     #     """
     #     Save tracing data to the disk inside self.save_folder. 
