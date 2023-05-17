@@ -16,12 +16,15 @@ from matplotlib import pyplot as plt
 from tracing.tracing import AutoTracingOCCULT
 from analysis.analysis import Analysis
 
-# Quality estimation
-
-# Analysis. 
-# 1. Run on first image; assign numbers to each identified fibril.
-# -- Problem: OCCULT-2 image analysis is very slow. Running for 300+ images will take a long while. 
-# 2. Move on to second image; 
+# Try other methods for tracing out first. OCCULT is not perfect :(
+# Radius of curvature / angles. Iron out. 
+# Look at distribution of separation ranges
+# Look at overlap
+# look at lifetime
+# Frames 62-87 are a good series
+# Limit 10-30
+# a-b and b-a
+# need better notes lol
 
 class Timeseries():
     def __init__(self, full_image):
@@ -81,7 +84,7 @@ class Timeseries():
         for tracing in self.sequence_tracings:
             tracing_index = self.sequence_tracings.index(tracing)
             print("Analyzing frame {}".format(tracing_index))
-            an = Analysis(self.full_image[tracing_index,:,:], tracing)
+            an = Analysis(self.full_image[tracing_index,:,b:], tracing)
             an.set_opts()
             result = an.run()
             # Replace the tracing in sequence_tracing with the analyzed version

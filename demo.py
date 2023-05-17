@@ -1,30 +1,39 @@
 import numpy as np
 import cv2
-import os
 import matplotlib.pyplot as plt
 from astropy.io import fits
+from skimage import filters, data, color, morphology, segmentation
+from tracing.tracing import AutoTracingOCCULT
 
-f_norm = fits.open("data/images/fits/halpha_width_mfbd_m300.fits")[0].data
-f_sharp = fits.open("data/images/fits/halpha_width_sharpened.fits")[0].data
+# Open the file
+f = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data
 
-f = f_sharp
+f = (f[0,100:600,:500]*180).astype(np.uint8)
 
-img_data = f.astype(np.uint8)
+# Sharpen the image
+f_sharpened = filters.unsharp_mask(f, radius=1, amount=4.0)
 
-# Blur + threshold
-blur = cv2.GaussianBlur(img_data,(7,7),0)
-th = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 2)
+# Use Otsu's method
+otsu_thresh = filters.threshold_otsu(f_sharpened)-0.05
+otsu_img = np.copy(f_sharpened)
+otsu_img[otsu_img < otsu_thresh] = 0.70
 
-fig, ax = plt.subplots(1,2)
-ax[0].imshow(th, origin="lower")
-ax[1].imshow(f, origin="lower")
+# Demo some segmentation methods
+hsm4 = filters.hessian(otsu_img, range(1,5), black_ridges=True)
+hsm4[otsu_img == 0.70] = 0
 
-# Edges + contours
-edges = cv2.Canny(img_data, threshold1=100, threshold2=150, apertureSize=7)
+# Try some edge detection. Hessian results are a bit rough - how can we clean up?
+random_walker = segmentation.random_walker(otsu_img, hsm4)
 
-contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+# --------------
+# Plot everything
+fig, ax = plt.subplots(1,1)
 
-ctr_map = np.zeros_like(edges)
-cv2.drawContours(ctr_map, contours, -1, (255,255,255), 1)
+ax.set_title("Sobel edge detection")
+ax.imshow(random_walker, origin="lower", cmap="gray")
+
+# ax[0].set_title("Hessian")
+# ax[0].imshow(hsm4, origin="lower", cmap="gray")
+
 
 plt.show()
