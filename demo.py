@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from astropy.io import fits
-from skimage import filters, data, color, morphology, segmentation, feature
+from skimage import filters, data, color, morphology, segmentation, feature, measure
 from tracing.tracing import AutoTracingOCCULT
 
 # Open the file
@@ -33,38 +33,18 @@ hsm4[hsm4 < 1] = 0
 
 # --------------
 # Plot everything
-fig, ax = plt.subplots(1, 2)
+fig, ax = plt.subplots(1, 1)
 
-# ax.set_title("Trying to clean up the edges")
-# ax.imshow(median, origin="lower", cmap="gray")
+ax.set_title("Trying to clean up the edges")
+ax.imshow(hsm4, origin="lower", cmap="gray")
 
-ax[0].set_title("OCCULT-2 on sharpened original")
-ax[0].imshow(f_sharpened, origin="lower", cmap="gray")
-ax[1].set_title("OCCULT-2 on Hessian")
-ax[1].imshow(hsm4, origin="lower", cmap="gray")
+for contour in contours:
+    ax.plot(contour[:, 1], contour[:, 0], linewidth=1)
 
-# # OCCULT tracing
-
-# ogtr = AutoTracingOCCULT(data=f_sharpened).run(rmin=35)
-# hstr = AutoTracingOCCULT(data=hsm4).run(nsm1=6, ngap=3, rmin=35)
-
-# xs = []
-# ys = []
-# for fibril in ogtr:
-#     xs.extend([c[0] for c in fibril])
-#     ys.extend([c[1] for c in fibril])
-#     xs.append(None)
-#     ys.append(None)
-# ax[0].plot(xs, ys, color="cyan")
-
-# xs = []
-# ys = []
-# for fibril in hstr:
-#     xs.extend([c[0] for c in fibril])
-#     ys.extend([c[1] for c in fibril])
-#     xs.append(None)
-#     ys.append(None)
-# ax[1].plot(xs, ys, color="cyan")
+# ax[0].set_title("OCCULT-2 on sharpened original")
+# ax[0].imshow(f_sharpened, origin="lower", cmap="gray")
+# ax[1].set_title("OCCULT-2 on Hessian")
+# ax[1].imshow(hsm4, origin="lower", cmap="gray")
 
 plt.show()
 # ------------- Other segmentation methods below

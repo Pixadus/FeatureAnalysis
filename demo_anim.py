@@ -2,18 +2,22 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 import numpy as np
 from astropy.io import fits
-from skimage import filters, data, color, morphology, segmentation, feature
-
+from skimage import filters
+from tracing.tracing import AutoTracingOCCULT
 
 f = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data
 
+# Frame start/stop values
+start = 0
+stop = 120
+
 # Create a Hessianified version of f
 fh = np.copy(f)
-for i in range(120):
+for i in range(start, stop):
     fhi = fh[i,:,:]
     fhi = (fhi*180).astype(np.uint8)
     fhi = filters.unsharp_mask(fhi, radius=1.0, amount=4.0)
-    fhi_thresh = filters.threshold_otsu(fhi)-0.05
+    fhi_thresh = filters.threshold_otsu(fhi)
     fhi[fhi < fhi_thresh] = 0.70
     fhih = filters.hessian(fhi, range(1,5), black_ridges=True)
     fhih[fhi == 0.70] = 0
@@ -26,9 +30,36 @@ fig, ax = plt.subplots(1,2, figsize=(10,10))
 ax[0].set_title("Sharpened original")
 ax[1].set_title("Otsu + Hessian filters")
 
+# Run OCCULT-2
+orig_tr = []
+hess_tr = []
+for i in range(start, stop):
+    print("O{}".format(i))
+    trm = AutoTracingOCCULT(data=f[i,:,:]).run(rmin=35)
+    trh = AutoTracingOCCULT(data=fh[i,:,:]).run(nsm1=6, ngap=3, rmin=35)
+    
+    xs = []
+    ys = []
+    for fib in trm:
+        xs.extend([c[0] for c in fib])
+        ys.extend([c[1] for c in fib])
+        xs.append(None)
+        ys.append(None)
+    ln, = ax[0].plot(xs, ys, color="cyan")
+    orig_tr.append(ln)
+    xs = []
+    ys = []
+    for fib in trh:
+        xs.extend([c[0] for c in fib])
+        ys.extend([c[1] for c in fib])
+        xs.append(None)
+        ys.append(None)
+    ln, = ax[1].plot(xs,ys, color="cyan")
+    hess_tr.append(ln)
+
 artists = []
-for i in range(120):
-    if i == 0:
+for i in range(start, stop):
+    if (i-start) == 0:
         ax[0].imshow(f[i,:,:], origin="lower", cmap="gray")
         ax[1].imshow(fh[i,:,:], origin="lower", cmap="gray")
     img0 = ax[0].imshow(f[i,:,:], origin="lower", cmap="gray", animated=True)
@@ -39,7 +70,7 @@ for i in range(120):
     title1 = ax[1].text(0.5,-0.15,"Frame {}".format(i), 
             size=plt.rcParams["axes.titlesize"],
             ha="center", transform=ax[1].transAxes, )
-    artists.append([img0, title0, img1, title1])
+    artists.append([img0, orig_tr[i-start], title0, img1, hess_tr[i-start], title1])
 
 ani = animation.ArtistAnimation(fig=fig, artists=artists, interval=300, blit=False)
 writer = animation.FFMpegWriter(fps = 2.5, bitrate=16000)
