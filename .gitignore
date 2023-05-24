@@ -12,6 +12,7 @@ data/tracing_results/*
 
 # Ignore timeseries results
 timeseries_results/
+ts_res/
 
 # Ignore huge fits file 
 data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits

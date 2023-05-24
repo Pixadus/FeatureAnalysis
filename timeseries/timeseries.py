@@ -84,7 +84,7 @@ class Timeseries():
         for tracing in self.sequence_tracings:
             tracing_index = self.sequence_tracings.index(tracing)
             print("Analyzing frame {}".format(tracing_index))
-            an = Analysis(self.full_image[tracing_index,:,b:], tracing)
+            an = Analysis(self.full_image[tracing_index,:,:], tracing)
             an.set_opts()
             result = an.run()
             # Replace the tracing in sequence_tracing with the analyzed version

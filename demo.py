@@ -33,63 +33,63 @@ hsm4[hsm4 < 1] = 0
 
 # --------------
 # Plot everything
-fig, ax = plt.subplots(1, 1)
+# fig, ax = plt.subplots(1, 1)
 
-ax.set_title("Trying to clean up the edges")
-ax.imshow(hsm4, origin="lower", cmap="gray")
+# ax.set_title("Trying to clean up the edges")
+# ax.imshow(hsm4, origin="lower", cmap="gray")
 
-for contour in contours:
-    ax.plot(contour[:, 1], contour[:, 0], linewidth=1)
+# for contour in contours:
+#     ax.plot(contour[:, 1], contour[:, 0], linewidth=1)
 
 # ax[0].set_title("OCCULT-2 on sharpened original")
 # ax[0].imshow(f_sharpened, origin="lower", cmap="gray")
 # ax[1].set_title("OCCULT-2 on Hessian")
 # ax[1].imshow(hsm4, origin="lower", cmap="gray")
 
-plt.show()
+# plt.show()
 # ------------- Other segmentation methods below
 
-# def store_evolution_in(lst):
-#     """Returns a callback function to store the evolution of the level sets in
-#     the given list.
-#     """
+def store_evolution_in(lst):
+    """Returns a callback function to store the evolution of the level sets in
+    the given list.
+    """
 
-#     def _store(x):
-#         lst.append(np.copy(x))
+    def _store(x):
+        lst.append(np.copy(x))
 
-#     return _store
+    return _store
 
 
-# # Morphological ACWE
-# image = hsm4
+# Morphological ACWE
+image = hsm4
 
-# # Initial level set
-# init_ls = segmentation.checkerboard_level_set(image.shape, 2)
-# # List with intermediate results for plotting the evolution
-# evolution = []
-# callback = store_evolution_in(evolution)
-# ls = segmentation.morphological_chan_vese(image, num_iter=5, init_level_set=init_ls,
-#                              smoothing=2, iter_callback=callback)
+# Initial level set
+init_ls = segmentation.checkerboard_level_set(image.shape, 2)
+# List with intermediate results for plotting the evolution
+evolution = []
+callback = store_evolution_in(evolution)
+ls = segmentation.morphological_chan_vese(image, num_iter=5, init_level_set=init_ls,
+                             smoothing=2, iter_callback=callback)
 
-# fig, axes = plt.subplots(1, 2, figsize=(8, 8))
-# ax = axes.flatten()
+fig, axes = plt.subplots(1, 2, figsize=(8, 8))
+ax = axes.flatten()
 
-# ax[0].imshow(image, cmap="gray", origin="lower")
-# ax[0].set_axis_off()
-# ax[0].contour(ls, [0.5], colors='r')
-# ax[0].set_title("ACWE segmentation (ck2, s2)", fontsize=12)
+ax[0].imshow(image, cmap="gray", origin="lower")
+ax[0].set_axis_off()
+ax[0].contour(ls, [0.5], colors='r')
+ax[0].set_title("ACWE segmentation (ck2, s2)", fontsize=12)
 
-# ax[1].imshow(ls, cmap="gray", origin="lower")
-# ax[1].set_axis_off()
-# contour = ax[1].contour(evolution[1], [0.5], colors='g')
-# contour.collections[0].set_label("g, Iteration 1")
-# contour = ax[1].contour(evolution[2], [0.5], colors='y')
-# contour.collections[0].set_label("y, Iteration 2")
-# contour = ax[1].contour(evolution[3], [0.5], colors='r')
-# contour.collections[0].set_label("r, Iteration 3")
-# ax[1].legend(loc="upper right")
-# title = "Morphological ACWE evolution"
-# ax[1].set_title(title, fontsize=12)
+ax[1].imshow(ls, cmap="gray", origin="lower")
+ax[1].set_axis_off()
+contour = ax[1].contour(evolution[1], [0.5], colors='g')
+contour.collections[0].set_label("g, Iteration 1")
+contour = ax[1].contour(evolution[2], [0.5], colors='y')
+contour.collections[0].set_label("y, Iteration 2")
+contour = ax[1].contour(evolution[3], [0.5], colors='r')
+contour.collections[0].set_label("r, Iteration 3")
+ax[1].legend(loc="upper right")
+title = "Morphological ACWE evolution"
+ax[1].set_title(title, fontsize=12)
 
-# fig.tight_layout()
-# plt.show()
+fig.tight_layout()
+plt.show()

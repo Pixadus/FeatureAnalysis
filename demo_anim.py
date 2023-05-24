@@ -4,6 +4,8 @@ import numpy as np
 from astropy.io import fits
 from skimage import filters
 from tracing.tracing import AutoTracingOCCULT
+from analysis.analysis import Analysis
+import csv
 
 f = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data
 
@@ -37,7 +39,60 @@ for i in range(start, stop):
     print("O{}".format(i))
     trm = AutoTracingOCCULT(data=f[i,:,:]).run(rmin=35)
     trh = AutoTracingOCCULT(data=fh[i,:,:]).run(nsm1=6, ngap=3, rmin=35)
-    
+
+    # Convert tracings to a dictionary
+    f_num = 0
+    fh_data = {}
+    for feature in trh:
+        fh_data[f_num] = []
+        for coord in feature:
+            c = {"coord" : (float(coord[0]), float(coord[1]))}
+            fh_data[f_num].append(c)
+        f_num += 1
+    # Convert tracings to a dictionary
+    f_num = 0
+    fb_data = {}
+    for feature in trh:
+        fb_data[f_num] = []
+        for coord in feature:
+            c = {"coord" : (float(coord[0]), float(coord[1]))}
+            fb_data[f_num].append(c)
+        f_num += 1
+
+    # Run analysis
+    print("Analyzing base {}".format(i))
+    an = Analysis(f[i,:,:], fb_data)
+    an.set_opts()
+    trm_results = an.run()
+
+    print("Analyzing hess {}".format(i))
+    an = Analysis(f[i,:,:], fh_data)
+    an.set_opts()
+    trh_results = an.run()
+
+    with open("ts_res/base/{}.csv".format(i), 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for fib in trm_results.keys():
+            for coord in trm_results[fib]:
+                writer.writerow([
+                    fib,
+                    coord['coord'][0],
+                    coord['coord'][1],
+                    coord['length'],
+                    coord['breadth']
+                ])
+    with open("ts_res/hess/{}.csv".format(i), 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for fib in trh_results.keys():
+            for coord in trh_results[fib]:
+                writer.writerow([
+                    fib,
+                    coord['coord'][0],
+                    coord['coord'][1],
+                    coord['length'],
+                    coord['breadth']
+                ])
+
     xs = []
     ys = []
     for fib in trm:
