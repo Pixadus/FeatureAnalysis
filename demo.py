@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from skimage import filters, data, color, morphology, segmentation, feature, measure
 from tracing.tracing import AutoTracingOCCULT
+import shapely
+from label_centerlines import get_centerline
 
 # Open the file
 f = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data
@@ -23,30 +25,6 @@ hsm4 = filters.hessian(otsu_img, range(1,5), black_ridges=True)
 hsm4[otsu_img == 0.70] = 0
 hsm4[hsm4 < 1] = 0
 
-# Try out reconstruction to get rid of little gaps
-# footprint2 = morphology.disk(2)
-# footprint1 = morphology.disk(2)
-
-# closing = morphology.binary_closing(hsm4, footprint1)
-
-# try out some segmentation algorithms
-
-# --------------
-# Plot everything
-# fig, ax = plt.subplots(1, 1)
-
-# ax.set_title("Trying to clean up the edges")
-# ax.imshow(hsm4, origin="lower", cmap="gray")
-
-# for contour in contours:
-#     ax.plot(contour[:, 1], contour[:, 0], linewidth=1)
-
-# ax[0].set_title("OCCULT-2 on sharpened original")
-# ax[0].imshow(f_sharpened, origin="lower", cmap="gray")
-# ax[1].set_title("OCCULT-2 on Hessian")
-# ax[1].imshow(hsm4, origin="lower", cmap="gray")
-
-# plt.show()
 # ------------- Other segmentation methods below
 
 def store_evolution_in(lst):
@@ -61,35 +39,52 @@ def store_evolution_in(lst):
 
 
 # Morphological ACWE
-image = hsm4
+image = hsm4.astype(bool)
 
 # Initial level set
 init_ls = segmentation.checkerboard_level_set(image.shape, 2)
 # List with intermediate results for plotting the evolution
-evolution = []
-callback = store_evolution_in(evolution)
-ls = segmentation.morphological_chan_vese(image, num_iter=5, init_level_set=init_ls,
-                             smoothing=2, iter_callback=callback)
+# acwe = segmentation.morphological_chan_vese(image, num_iter=3, init_level_set=init_ls, smoothing=2)
 
-fig, axes = plt.subplots(1, 2, figsize=(8, 8))
-ax = axes.flatten()
+# Dilate a bit
+fp = morphology.square(1)
+dial = morphology.binary_dilation(image, fp)
 
-ax[0].imshow(image, cmap="gray", origin="lower")
-ax[0].set_axis_off()
-ax[0].contour(ls, [0.5], colors='r')
-ax[0].set_title("ACWE segmentation (ck2, s2)", fontsize=12)
+# Remove small holes
+sh = morphology.remove_small_holes(dial, 64)
+filtered = morphology.remove_small_objects(sh, 10)
 
-ax[1].imshow(ls, cmap="gray", origin="lower")
-ax[1].set_axis_off()
-contour = ax[1].contour(evolution[1], [0.5], colors='g')
-contour.collections[0].set_label("g, Iteration 1")
-contour = ax[1].contour(evolution[2], [0.5], colors='y')
-contour.collections[0].set_label("y, Iteration 2")
-contour = ax[1].contour(evolution[3], [0.5], colors='r')
-contour.collections[0].set_label("r, Iteration 3")
-ax[1].legend(loc="upper right")
-title = "Morphological ACWE evolution"
-ax[1].set_title(title, fontsize=12)
+# Erosion
+fp = morphology.square(1)
+ero = morphology.binary_erosion(filtered, fp)
+
+contours = measure.find_contours(ero, 0.5)
+
+# Plotting
+fig, ax = plt.subplots(1, 1, figsize=(8,8))
+
+ax.imshow(ero, origin="lower", cmap="gray")
+ax.set_title("Contours")
+
+polygons = []
+for contour in contours:
+    ax.plot(contour[:, 1], contour[:, 0], linewidth=0.5, color="red")
+    # Create polygon
+    polygon = shapely.Polygon(contour)
+    polygons.append(polygon)
+
+avg = 0
+for polygon in polygons:
+    avg += polygon.area
+avg = avg / len(polygons)
+
+# Create a polyfit for polygons larger than avg
+for polygon, contour in zip(polygons, contours):
+    if polygon.area > avg:
+        pf = np.polyfit(contour[:,1], contour[:,0], deg=3)
+
+# for contour in gicnt:
+#     ax[1].plot(contour[:, 1], contour[:, 0], linewidth=0.5, color="red")
 
 fig.tight_layout()
 plt.show()
