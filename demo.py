@@ -1,11 +1,17 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from astropy.io import fits
-from skimage import filters, data, color, morphology, segmentation, feature, measure
+from skimage import filters, data, color, morphology, segmentation, feature, measure, transform, restoration, exposure
 from tracing.tracing import AutoTracingOCCULT
 import shapely
+from scipy.signal import savgol_filter
+from scipy import ndimage
 from label_centerlines import get_centerline
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import minimum_spanning_tree
+import itertools
 
 # Open the file
 f = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data
@@ -37,14 +43,7 @@ def store_evolution_in(lst):
 
     return _store
 
-
-# Morphological ACWE
 image = hsm4.astype(bool)
-
-# Initial level set
-init_ls = segmentation.checkerboard_level_set(image.shape, 2)
-# List with intermediate results for plotting the evolution
-# acwe = segmentation.morphological_chan_vese(image, num_iter=3, init_level_set=init_ls, smoothing=2)
 
 # Dilate a bit
 fp = morphology.square(1)
@@ -58,33 +57,59 @@ filtered = morphology.remove_small_objects(sh, 10)
 fp = morphology.square(1)
 ero = morphology.binary_erosion(filtered, fp)
 
-contours = measure.find_contours(ero, 0.5)
+# filter
+filt1 = filters.meijering(ero, sigmas=range(1,7,1), alpha=-1/3, black_ridges=False)
+filt1 = filters.median(filt1)
+filt1[filt1 < 0.3] = 0
+maxima = morphology.extrema.local_maxima(filt1)
+# sobel = filters.sobel(filt1)
+
+low = 0.2
+high = 0.7
+lowt = (filt1 > low).astype(int)
+hight = (filt1 > high).astype(int)
+hyst = filters.apply_hysteresis_threshold(filt1, low, high)
+
+# filt2 = segmentation.inverse_gaussian_gradient(filt1, 10, 3)
+# filt1[filt1 < 0.5] = 0
+
+# filt2 = filters.rank.gradient(filters.median(filt1, morphology.disk(3)), morphology.disk(2))
+filt2 = filters.laplace(filt1)
+# filt2[filt2 < 10] = 0
+# filt2 = filt2 + morphology.extrema.local_maxima(filt1)
+# filt2[filt2 > 0] = 1
+
+init_ls = segmentation.checkerboard_level_set(filt1.shape, 3)
+
+evo = []
+cb = store_evolution_in(evo)
+
+ls = segmentation.morphological_chan_vese(np.gradient(filt1)[0] > 0, num_iter=200, 
+                                          init_level_set=np.gradient(filt1)[0] > 0,
+                                          smoothing=1, iter_callback=cb)
+
+# ls = segmentation.morphological_geodesic_active_contour(filt1, num_iter=100, init_level_set=hyst,
+#                              smoothing=1, balloon=-1, iter_callback=cb)
 
 # Plotting
-fig, ax = plt.subplots(1, 1, figsize=(8,8))
+fig, ax = plt.subplots(1, 1)
+ax.imshow(np.gradient(filt1)[0] > 0, origin="lower", cmap="gray")
+# ax[1].imshow(filt2, origin="lower", cmap="gray")
+# ax.contour(ls, [0.25], colors="c")
 
-ax.imshow(ero, origin="lower", cmap="gray")
-ax.set_title("Contours")
+for i in range(len(evo)):
+    ax.cla()
+    ax.imshow(filt1, origin="lower", cmap="gray")
+    ax.set_title("GAC, iter={}".format(i))
+    ax.contour(evo[i], [0.25], colors="c")
+    fig.savefig("artist{}.png".format(i), format="png", dpi=400)
+    print(i)
 
-polygons = []
-for contour in contours:
-    ax.plot(contour[:, 1], contour[:, 0], linewidth=0.5, color="red")
-    # Create polygon
-    polygon = shapely.Polygon(contour)
-    polygons.append(polygon)
 
-avg = 0
-for polygon in polygons:
-    avg += polygon.area
-avg = avg / len(polygons)
-
-# Create a polyfit for polygons larger than avg
-for polygon, contour in zip(polygons, contours):
-    if polygon.area > avg:
-        pf = np.polyfit(contour[:,1], contour[:,0], deg=3)
-
-# for contour in gicnt:
-#     ax[1].plot(contour[:, 1], contour[:, 0], linewidth=0.5, color="red")
+# ax.imshow(filt1, origin="lower", cmap="gray")
+# ax.set_title("MorphACWE and MorphGAC")
+# ax.contour(ls1, [0.5], colors='cyan')
+# ax.contour(ls2, [0.5], colors='blue')
 
 fig.tight_layout()
 plt.show()
