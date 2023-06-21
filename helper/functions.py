@@ -8,6 +8,11 @@ Created on Tue 8.5.22
 for FeatureTracing.
 """
 
+import numpy as np
+import pandas as pd
+from shapely import MultiPolygon, Polygon, Point, LineString, polygonize
+from shapely.ops import split
+
 # This was from a StackExchange answer - see https://stackoverflow.com/a/19829987.
 class ZoomPan:
     def __init__(self, ax=None):
@@ -109,3 +114,36 @@ def erase_layout_widgets(layout):
     """
     for i in reversed(range(layout.count())):
         layout.itemAt(i).widget().setParent(None)
+
+def Identify_NonOutliers(df, percent=0.1):
+    Q1 = df.quantile(percent)
+    Q3 = df.quantile(1-percent)
+    IQR = Q3 - Q1
+    trueList = ~((df < (Q1 - 1.5 * IQR)) |(df > (Q3 + 1.5 * IQR)))
+    return trueList
+
+class CurvatureSegmentation:
+    def __init__(self, polygon=None, min_arc_dist=10, max_spatial_dist=20, min_area=300):
+        """
+        Parameters
+        ----------
+        polygon : shapely.Polygon
+            Polygon to segment.
+        min_arc_dist : int (default 10)
+            Minimum arc length distance between neighboring identified curves
+        max_spatial_dist : int (default 20)
+            Maximum Euclidian distance between matched curves
+        """
+        self.polygon = polygon
+        self.min_arc_dist = min_arc_dist
+        self.max_spatial_dist = max_spatial_dist
+        self.min_area = min_area
+    
+    def run(self):
+        """
+        Run the segmentation of the polygon. 
+
+        Returns
+        -------
+        polygons : shapely.MultiPolygon 
+        """
