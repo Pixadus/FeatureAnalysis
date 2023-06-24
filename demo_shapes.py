@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.rcParams['savefig.format'] = 'svg'
 import pandas as pd
-from shapely import Polygon, Point, LineString, MultiLineString, polygonize
+from shapely import Polygon, MultiPolygon, Point, LineString, MultiLineString, polygonize
 from shapely.ops import split
 from scipy.signal import savgol_filter
 
@@ -200,11 +200,13 @@ for xc,yc,kc in zip(df.x, df.y, df.k):
     df['matched'] = df.apply(lambda row: row.matched or abs(df_full[df_full.k == row.k].index - opp_index) < min_arc_dist, axis=1)
 
 
-plt.scatter(df.x, df.y, s=1, c=(df.k), cmap="inferno")
-plt.scatter(df_sub.x, df_sub.y, s=1, c=(df_sub.k), cmap="inferno")
+# plt.scatter(df.x, df.y, s=1, c=(df.k), cmap="inferno")
+# plt.scatter(df_sub.x, df_sub.y, s=1, c=(df_sub.k), cmap="inferno")
+
+mp = MultiPolygon(shapelist)
 
 i=0
-for s in shapelist:
+for s in mp.geoms:
     colors = ["green","blue","orange", "red"]
     x,y = s.exterior.xy
     plt.plot(x,y, color=colors[i])

@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from shapely import MultiPolygon, Polygon, Point, LineString, polygonize
 from shapely.ops import split
+from scipy.signal import savgol_filter
 
 # This was from a StackExchange answer - see https://stackoverflow.com/a/19829987.
 class ZoomPan:
@@ -123,7 +124,7 @@ def Identify_NonOutliers(df, percent=0.1):
     return trueList
 
 class CurvatureSegmentation:
-    def __init__(self, polygon=None, min_arc_dist=10, max_spatial_dist=20, min_area=300):
+    def __init__(self, polygon, min_arc_dist=10, max_spatial_dist=20, min_area=300, percent_thresh=0.15):
         """
         Parameters
         ----------
@@ -133,13 +134,16 @@ class CurvatureSegmentation:
             Minimum arc length distance between neighboring identified curves
         max_spatial_dist : int (default 20)
             Maximum Euclidian distance between matched curves
+        pecent_thresh : float (default 0.15)
+            Only consider the upper (percent) curves. Higher values increase runtime.
         """
         self.polygon = polygon
         self.min_arc_dist = min_arc_dist
         self.max_spatial_dist = max_spatial_dist
         self.min_area = min_area
+        self.percent_thresh = percent_thresh
     
-    def run(self):
+    def run(self) -> MultiPolygon:
         """
         Run the segmentation of the polygon. 
 
@@ -147,3 +151,139 @@ class CurvatureSegmentation:
         -------
         polygons : shapely.MultiPolygon 
         """
+
+        # TODO - only works with exteriors for now, even if interior specified
+        x, y = self.polygon.exterior.xy
+        x = savgol_filter(x, 30, 3)
+        y = savgol_filter(y, 30, 3)
+
+        # Recreate polygon with smoothed coordinates
+        self.polygon = Polygon(list(zip(x,y)))
+
+        # Calculating curvature at every point
+        n=0
+        xp, yp, xpp, ypp = None, None, None, None
+        klist = []
+        for xc, yc in zip(x,y):
+            # Skip the first two entries; xpp/ypp not defined here
+            if n <= 3:
+                n+=1
+                continue
+            xp = xc-x[n-2]
+            yp = yc-y[n-2]
+            xp_r = x[n-2]-x[n-4]
+            yp_r = y[n-2]-y[n-4]
+            xpp = xp-xp_r
+            ypp = yp-yp_r
+            k = abs(xp*ypp-yp*xpp)/((xp**2+yp**2)**(3/2))
+            klist.append((k,xc,yc))
+            n+=1
+
+        df = pd.DataFrame({
+            'k': [k[0] for k in klist],
+            'x': [k[1] for k in klist],
+            'y': [k[2] for k in klist]
+        })
+        df_full = df.copy(deep=True)
+
+        # Find all points that don't lie too far away from the mean (ext)
+        nonOutlierList = Identify_NonOutliers(df, self.percent_thresh)
+        df = df[~nonOutlierList.k]
+
+        # Add a 'matched' variable
+        df['matched'] = False
+
+        s_index = 0
+        shape = self.polygon
+        shapelist = [shape]
+        multisegments = []
+        for xc,yc,kc in zip(df.x, df.y, df.k):
+            s_index = 0
+            for s in shapelist:
+                if s.touches(Point([xc, yc])) or s.contains(Point([xc,yc])):
+                    break
+                # else s_index < len(shapelist)-1:
+                #     s_index += 1
+                else:
+                    s_index += 1
+
+            shape = shapelist[s_index]
+
+            if df[df.k == kc].iloc[0].matched:
+                continue
+            df['dist'] = df.apply(lambda row: np.linalg.norm(np.array([row.x, row.y]) - np.array([xc, yc])), axis=1)
+            df.sort_values('dist', ignore_index=True, inplace=True)
+
+            # Don't consider already-matched curvature values
+            df['considered'] = df.apply(lambda row: not row.matched, axis=1)
+
+            # Don't consider curvatures too far away
+            df['considered'] = df.apply(lambda row: row.considered and row.dist <= self.max_spatial_dist, axis=1)
+
+            # Make sure values are far away from one another on the line
+            orig_index = df_full[df_full.k == kc].index
+            df['considered'] = df.apply(lambda row: row.considered and abs(df_full[df_full.k == row.k].index-orig_index) > self.min_arc_dist, axis=1)
+
+            # Make sure the interpolated line between each curvature point lies entirely within the shape. 
+            df['considered'] = df.apply(lambda row: row.considered and np.array([shape.contains(Point(c1,c2)) or Point(c1,c2).touches(shape) for c1,c2 in zip(np.linspace(row.x, xc, 10), np.linspace(row.y, yc, 10))]).all(),  axis=1)
+
+            # Divide Polygon based on string
+            try:
+                connx = df[df.considered == True].iloc[0].x
+                conny = df[df.considered == True].iloc[0].y
+                connk = df[df.considered == True].iloc[0].k
+                conn_full_ind = df_full[df_full.k == connk].index
+            except IndexError:
+                continue
+            line = LineString([(xc, yc), (connx, conny)])
+            res = split(shape, line)
+
+            # Check if the resultant polygons are below the minimum area
+            ptf = np.array([r.area > self.min_area for r in res.geoms])
+            if not ptf.all():
+                continue
+
+            # Update the shape_list
+            shapelist.pop(s_index)
+            shapelist.extend([s for s in res.geoms])
+
+            # Add LineString to multisegments if only 1 geom returned (i.e. didn't divide in two)
+            if len(res.geoms) == 1:
+                multisegments.append((orig_index, conn_full_ind))
+
+            # Create subshape if multisegments form a closed shape
+            if len(multisegments) == 2:
+                df1_0 = df_full.iloc[multisegments[0][0]]
+                df1_1 = df_full.iloc[multisegments[0][1]]
+                df2_0 = df_full.iloc[multisegments[1][0]]
+                df2_1 = df_full.iloc[multisegments[1][1]]
+
+                line1 = LineString([(df1_0.x, df1_0.y), (df1_1.x, df1_1.y)])
+                line2 = LineString([(df2_0.x, df2_0.y), (df2_1.x, df2_1.y)])
+                if multisegments[0][0] > multisegments[1][0]:
+                    line3_df = df_full.iloc[multisegments[1][0].values[0]:multisegments[0][0].values[0]+1]
+                else:
+                    line3_df = df_full.iloc[multisegments[0][0].values[0]:multisegments[1][0].values[0]+1]
+                if multisegments[0][1] > multisegments[1][1]:
+                    line4_df = df_full.iloc[multisegments[1][1].values[0]:multisegments[0][1].values[0]+1]
+                else:
+                    line4_df = df_full.iloc[multisegments[0][1].values[0]:multisegments[1][1].values[0]+1]
+                line3 = LineString([(x,y) for x,y in zip(line3_df.x, line3_df.y)])
+                line4 = LineString([(x,y) for x,y in zip(line4_df.x, line4_df.y)])
+
+                intersect = polygonize([line1, line3, line2, line4]).geoms[0]
+
+                s1 = shape-intersect
+                        
+                shapelist.pop(s_index)
+                shapelist.extend([s1,intersect])
+                multisegments = []
+
+            # Mark both curvature points and nearby points on both sides as being matched
+            df['matched'] = df.apply(lambda row: row.matched or abs(df_full[df_full.k == row.k].index - orig_index) < self.min_arc_dist, axis=1)
+            opp_index = df_full[df_full.k == df[df.considered == True].iloc[0].k].index
+            df['matched'] = df.apply(lambda row: row.matched or abs(df_full[df_full.k == row.k].index - opp_index) < self.min_arc_dist, axis=1)
+
+        # Create multipolygon from shapelist and return it
+        mp = MultiPolygon(shapelist)
+        return(mp)

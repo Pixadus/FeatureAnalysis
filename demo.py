@@ -4,10 +4,13 @@ float_formatter = "{:.2f}".format
 np.set_printoptions(threshold=sys.maxsize, formatter={'float_kind':float_formatter})
 import cv2
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+mpl.rcParams['savefig.format'] = 'svg'
 import matplotlib.animation as animation
 from astropy.io import fits
 from skimage import filters, data, color, morphology, segmentation, feature, measure, transform, restoration, exposure
 from tracing.tracing import AutoTracingOCCULT
+from helper.functions import CurvatureSegmentation
 import shapely
 from scipy.signal import savgol_filter
 from scipy import ndimage
@@ -29,21 +32,11 @@ otsu_thresh = filters.threshold_otsu(f_sharpened)-0.05
 otsu_img = np.copy(f_sharpened)
 otsu_img[otsu_img < otsu_thresh] = 0.70
 
-# Use local Otsu's method
-otsu_img_local = (np.copy(f_sharpened)*255).astype(np.uint8)
-otsu_thresh = filters.rank.otsu(otsu_img_local, morphology.disk(22.5))
-otsu_img_local[otsu_img_local < otsu_thresh] = 0
-otsu_img_local[otsu_img == 0.7] = 0
 
 # Apply Hessian to get a binary map
-hsm4 = filters.hessian(otsu_img, range(1,5), black_ridges=True)
+hsm4 = filters.hessian(otsu_img, range(1,6), black_ridges=True)
 hsm4[otsu_img == 0.70] = 0
 hsm4[hsm4 < 1] = 0
-
-# Apply Hessian to get a binary map
-hsm5 = filters.hessian(otsu_img_local, range(1,5), black_ridges=True)
-hsm5[otsu_img == 0.70] = 0
-hsm5[hsm5 < 1] = 0
 
 # ------------- Other segmentation methods below
 
@@ -57,7 +50,7 @@ def store_evolution_in(lst):
 
     return _store
 
-image = hsm5.astype(bool)
+image = hsm4.astype(bool)
 
 # Dilate a bit
 fp = morphology.square(1)
@@ -72,16 +65,16 @@ fp = morphology.square(1)
 ero = morphology.binary_erosion(filtered, fp)
 
 # filter
-filt1 = filters.meijering(ero, sigmas=range(1,5,1), alpha=-1/3, black_ridges=False)
+filt1 = filters.meijering(ero, sigmas=range(1,7,1), black_ridges=False)
 filt1 = filters.median(filt1)
-# filt1[filt1 < 0.4] = 0
+filt1[filt1 < 0.33] = 0
 
 init_ls = segmentation.checkerboard_level_set(filt1.shape, 3)
 
 evo = []
 cb = store_evolution_in(evo)
 
-ls = segmentation.morphological_chan_vese(filt1, num_iter=100, 
+ls = segmentation.morphological_chan_vese(filt1, num_iter=10, 
                                           init_level_set=init_ls,
                                           smoothing=1, iter_callback=cb)
 
@@ -89,30 +82,59 @@ ls = segmentation.morphological_chan_vese(filt1, num_iter=100,
 #                              smoothing=1, balloon=-1, iter_callback=cb)
 
 # Plotting
-fig, ax = plt.subplots(1, 1)
+fig, ax = plt.subplots(1, 2)
 
-ls = morphology.remove_small_holes(ls, 128)
-ax.imshow(ls, origin="lower", cmap="gray")
+# ls = morphology.remove_small_holes(ls, 128)
+ax[0].imshow(f_sharpened, origin="lower", cmap="gray")
+ax[0].set_title("get_centerlines centerlines (sm=0.25, simp=0.2)")
+ax[1].imshow(f_sharpened, origin="lower", cmap="gray")
+ax[1].set_title("np.polylines centerlines (deg=2)")
 contours = measure.find_contours(ls, 0.5)
+# Convert contours to shapely polygons + run curvature segmentation
+polygons = []
 for contour in contours:
-    mx = np.mean(contour[:,1])
-    my = np.mean(contour[:,0])
-    if abs(np.linalg.norm(np.array([100,380])-np.array([mx,my]))) < 60:
-        ax.plot(contour[:, 1], contour[:, 0], linewidth=2)
-        print("x", contour[:,1], "\ny", contour[:,0])
-# ax[0,0].imshow(otsu_img, origin="lower", cmap="gray")
-# ax[0,0].set_title("Globally thresholded otsu image")
-# ax[0,1].imshow(otsu_img_local, origin="lower", cmap="gray")
-# ax[0,1].set_title("Locally thresholded otsu image")
-# ax[1,0].imshow(hsm4, origin="lower", cmap="gray")
-# ax[1,0].set_title("Global Hessian")
-# ax[1,1].imshow(hsm5, origin="lower", cmap="gray")
-# ax[1,1].set_title("Local Hessian")
-# ax[1].imshow(filt2, origin="lower", cmap="gray")
-# ax.contour(ls, [0.25], colors="c")
+    polygon = shapely.Polygon([(x,y) for x,y in zip(contour[:,1], contour[:,0])])
+    if polygon.area > 100:
+        seg = CurvatureSegmentation(polygon=polygon, min_area=150, percent_thresh=0.2).run()
+        polygons.append(seg)
 
-# 100, 380
+# Display contents of multipolygons
+for multipolygon in polygons:
+    for polygon in multipolygon.geoms:
+        if polygon.area > 150:
+            x,y = polygon.exterior.xy
+            ax[0].plot(x,y, linewidth=0.75)
+            centerline = get_centerline(polygon, segmentize_maxlen=0.25, simplification=0.2)
+            x,y = centerline.xy
+            ax[0].plot(x,y, color='cyan')
 
+# Display contents of multipolygons
+for multipolygon in polygons:
+    for polygon in multipolygon.geoms:
+        if polygon.area > 150:
+            x,y = polygon.exterior.xy
+            ax[1].plot(x,y, linewidth=0.75)
+            if abs(np.min(x) - np.max(x)) > abs(np.min(y) - np.max(y)):
+                pf = np.polyfit(x,y, 2)
+                p = np.poly1d(pf)
+                dy = p(x)
+                ax[1].plot(x,dy, color='cyan')
+            else:
+                pf = np.polyfit(y,x,2)
+                p = np.poly1d(pf)
+                dx = p(y)
+                ax[1].plot(dx, y, color='cyan')
+
+# Move "interior" polygons to interiors of polygons TODO
+# newpolygons = []
+# for polygon in polygons:
+#     newpoly = polygon
+#     within = np.where(np.array([p.within(polygon) for p in polygons]))
+#     for w in within[0]:
+#         if w != 0:
+#             newpoly = newpoly - polygons[w]
+#             print(len(newpoly.interiors))
+#     newpolygons.append(newpoly)
 
 # for i in range(len(evo)):
 #     ax.cla()
@@ -121,12 +143,6 @@ for contour in contours:
 #     ax.contour(evo[i], [0.25], colors="c")
 #     fig.savefig("artist{}.png".format(i), format="png", dpi=400)
 #     print(i)
-
-
-# ax.imshow(filt1, origin="lower", cmap="gray")
-# ax.set_title("MorphACWE and MorphGAC")
-# ax.contour(ls1, [0.5], colors='cyan')
-# ax.contour(ls2, [0.5], colors='blue')
 
 fig.tight_layout()
 plt.show()
