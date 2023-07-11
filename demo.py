@@ -23,7 +23,7 @@ import itertools
 # Open the file
 f_ts = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data
 
-for i in range(62, 87):
+for i in range(109, 120):
     print(i)
     f = (f_ts[i]*180).astype(np.uint8)
 
