@@ -24,7 +24,7 @@ from analysis.analysis import Analysis
 # Frames 62-87 are a good series
 # Limit 10-30
 # a-b and b-a
-# need better notes lol
+# need better notes 
 
 class Timeseries():
     def __init__(self, full_image):
