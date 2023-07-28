@@ -39,7 +39,7 @@ active = pd.DataFrame({'start_frame': 0,
                         'xvals': [x],
                         'yvals': [y],
                         'alive': False,
-                    } for i,x,y in zip(xs, ys, unique_ids))
+                    } for x,y,i in zip(xs, ys, unique_ids))
 
 # Open timeseries for visualization purposes
 f = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data[1,:,:]
@@ -50,32 +50,42 @@ for i in range(120):
     if i == 0:
         continue
 
-    # Assume nonactive until proved otherwise
+    # Assume inactive until proved otherwise
     active.alive = False
 
-    def match_frame_features(mi, ci, max_coordinate_distance):
+    # Retrieve ith frame
+    ci = tracings[i]
+
+    # Retrieve the i-1th frame
+    mi = tracings[i-1]
+
+    def match_frame_features(dfa, dfb, max_coordinate_distance):
         """
-        Find feature matches in frame B (ci) to features in frame A (mi)
+        Find feature matches in frame B (dfb) to features in frame A (dfa)
 
         Parameters
         ----------
-        mi : DataFrame
+        dfa : DataFrame
             DataFrame 1 (initial)
-        ci : DataFrame
+        dfb : DataFrame
             DataFrame 2 (final)
         max_coordinate_distance : float
             Max allowed distance between candidate coordiantes.
 
         Returns
         -------
-        mi : DataFrame
+        dfa : DataFrame
             Dataframe with updated values for match_id and match_distance
         """
-        # Get all x,y coordinates of current frame (ci), store in numpy array
-        icoords = np.array([ci.x, ci.y]).T
 
-        # Iterate over all x,y in previous frame (mi)
-        for x,y in zip(mi.x, mi.y):
+        dfa.match_id = None
+        dfa.match_distance = 0.0
+
+        # Get all x,y coordinates of current frame (dfb), store in numpy array
+        icoords = np.array([dfb.x, dfb.y]).T
+
+        # Iterate over all x,y in previous frame (dfa)
+        for x,y in zip(dfa.x, dfa.y):
             # Reduce coordinate candidates to those that have an x & y both within 20 pixels
             ic_reduced = icoords[np.where(
                 (abs(icoords[:,0]-x) < max_coordinate_distance) &
@@ -94,34 +104,24 @@ for i in range(120):
                 
             # Get feature ID of closest coordinate
             # This takes a long time. Can we do this without getting this?
-            f_match = df[(df.x == min[1]) & (df.y == min[2])].iloc[0]
+            f_match = dfb[(dfb.x == min[1]) & (dfb.y == min[2])].iloc[0]
             fid = f_match.f_num
 
-            # Set mi match_id and match_distance
-            mi.loc[(mi.x == x) & (mi.y == y), 'match_id'] = fid
-            mi.loc[(mi.x == x) & (mi.y == y), 'match_distance'] = min[0]
+            # Set dfa match_id and match_distance
+            dfa.loc[(dfa.x == x) & (dfa.y == y), 'match_id'] = fid
+            dfa.loc[(dfa.x == x) & (dfa.y == y), 'match_distance'] = min[0]
 
             # Remove match from icoords to prevent multiple coordinates matching
             icoords = np.delete(icoords, np.where((icoords[:,0] == x) & (icoords[:,1] == y)), axis=0)
 
-        # Return updated mi DataFrame
-        return(mi)
-    
-    # Retrieve ith frame
-    ci = tracings[i]
-    ci.match_id = None
-    ci.match_distance = 0.0
-
-    # Retrieve the i-1 frame 
-    mi = tracings[i-1]
-    mi.match_id = None
-    mi.match_distance = 0.0
+        # Return updated dfa DataFrame
+        return(dfa)
 
     # Find closest coordinates from all i coordinates to i-1 coordinates.
-    ci = match_frame_features(mi, ci, max_coordinate_distance)
+    ci = match_frame_features(ci, mi, max_coordinate_distance)
 
     # Find closest coordinates from all i-1 coordinates to i coordinates. 
-    mi = match_frame_features(ci, mi, max_coordinate_distance)
+    mi = match_frame_features(mi, ci, max_coordinate_distance)
 
     mici = {}
     cimi = {}
@@ -137,15 +137,33 @@ for i in range(120):
         mode_mid = max(match_ids, key=match_ids.count)
         cimi[uniq] = mode_mid
 
-    # If mici match-pair equals cimi match-pair, then the pairing is valid. More restrictive, but closer match.
+    for key in mici.keys():
+        # If a feature matches in both mi-ci and ci-mi, add it to the active list. 
+        try:
+            if (key == cimi[mici[key]]):
+                # The features match! 
+                diff = (abs(i - active.start_frame) - 1).tolist() # Subtract 1 since we want to look for the i-1 index.
+                f_nums = active.f_nums.tolist()
 
+                # Use "diff" as a frame indicator to see where we should look
+                try:
+                    cf_fn = [fn[d] for d, fn in zip(diff, f_nums)]
+                except IndexError:
+                    print("Error:", i, diff, f_nums)
 
+                #Check if key is already in active. 
+                if key in cf_fn:
+                    # Should never be duplicates. But let's confirm this real fast. 
+                    index = cf_fn.count(key)
+                    if index > 1:
+                        print("Found {} occurences of {} in frame {}".format(index, key, i))
+                # If not, create a new active row.
+                # else:
 
-
-
-
-
-
+        except KeyError:
+            # If the key wasn't found, the matching feature in ci didn't find a match. 
+            # This would happen if the feature in ci was much longer than in mi, or has already been matched.  
+            continue
 
 
 
