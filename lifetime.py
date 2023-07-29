@@ -42,7 +42,7 @@ active = pd.DataFrame({'start_frame': 0,
                     } for x,y,i in zip(xs, ys, unique_ids))
 
 # Open timeseries for visualization purposes
-f = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data[1,:,:]
+f = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data
 
 # Start the matching process
 for i in range(120):
@@ -205,14 +205,52 @@ for i in range(120):
         else:
             active.drop(index, inplace=True)
 
-    # Reset the index to make up for the dropped frames
+    # Reset the indicies on active and completed to accomodate for the modified dataframes
     active.reset_index()
+    completed.reset_index()
 
-    # Print out the completed dataframe
-    print(completed)
+    # Let's try plotting everything.
+    plt.imshow(f[i,:,:], origin="lower")
+    
+    # Plot the unmatched fibrils
+    xs = []
+    ys = []
+    for uniq in tracings[i-1].f_num.unique():
+        x = tracings[i-1][tracings[i-1].f_num == uniq].x.tolist()
+        y = tracings[i-1][tracings[i-1].f_num == uniq].y.tolist()
+        xs.extend(x)
+        ys.extend(y)
+        xs.append(None)
+        ys.append(None)
+    plt.plot(xs, ys, color="blue")
 
+    # Plot the active fibrils
+    xs = []
+    ys = []
+    for index, row in active.iterrows():
+        coord_index = (i - row.start_frame) - 1
+        x = row.xvals[coord_index]
+        y = row.yvals[coord_index]
+        xs.extend(x)
+        ys.extend(y)
+        xs.append(None)
+        ys.append(None)
+    plt.plot(xs, ys, color="red")
 
-## TODO next time, move to completed - and figure out why we're not finding new creations. Check what the content of start_frame is each loop.
+    # Plot the completed fibrils
+    xs = []
+    ys = []
+    for index, row in completed[(completed.start_frame <= i) & (completed.end_frame >= i)].iterrows():
+        coord_index = (i - row.start_frame) - 1
+        x = row.xvals[coord_index]
+        y = row.yvals[coord_index]
+        xs.extend(x)
+        ys.extend(y)
+        xs.append(None)
+        ys.append(None)
+    plt.plot(xs, ys, color="green")
+    plt.show()
+
 
 
 
