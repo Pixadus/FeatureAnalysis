@@ -142,39 +142,82 @@ for i in range(120):
         try:
             if (key == cimi[mici[key]]):
                 # The features match! 
-                diff = (abs(i - active.start_frame) - 1).tolist() # Subtract 1 since we want to look for the i-1 index.
+                diff = ((i-active.start_frame) - 1).tolist() # Subtract 1 since we want to look for the i-1 index.
                 f_nums = active.f_nums.tolist()
 
                 # Use "diff" as a frame indicator to see where we should look
                 try:
-                    cf_fn = [fn[d] for d, fn in zip(diff, f_nums)]
+                    # cf_fn = [fn[d] for d, fn in zip(diff, f_nums)]
+                    cf_fn = []
+                    for d, fn in zip(diff, f_nums):
+                        cf_fn.append(fn[d])
                 except IndexError:
-                    print("Error:", i, diff, f_nums)
+                    print("Error:", i, d, fn)
 
-                #Check if key is already in active. 
+                x = ci[ci.f_num == mici[key]].x.tolist()
+                y = ci[ci.f_num == mici[key]].y.tolist()
+
+                # Check if key is already in active. 
                 if key in cf_fn:
-                    # Should never be duplicates. But let's confirm this real fast. 
-                    index = cf_fn.count(key)
-                    if index > 1:
-                        print("Found {} occurences of {} in frame {}".format(index, key, i))
-                # If not, create a new active row.
-                # else:
+                    # Should never be duplicates. TODO confirm this. 
+                    index = cf_fn.index(key)
 
+                    # Add to the active entry
+                    active.loc[index, 'f_nums'].append(mici[key])
+                    active.loc[index, 'xvals'].append(x)
+                    active.loc[index, 'yvals'].append(y)
+                    active.loc[index, 'alive'] = True
+
+                # If not, create a new active row.
+                else:
+                    active_slice = pd.DataFrame({
+                            'start_frame': i,
+                            'f_nums': [[mici[key]]],
+                            'xvals': [[x]],
+                            'yvals': [[y]],
+                            'alive': True
+                        })
+                    
+                    active = pd.concat([active, active_slice], ignore_index=True)
+    
         except KeyError:
             # If the key wasn't found, the matching feature in ci didn't find a match. 
             # This would happen if the feature in ci was much longer than in mi, or has already been matched.  
             continue
+    
+    # Move all active=False entries to "completed", if they take place over 3+ frames
+    
+    # Iterate over rows + indexes
+    for index, row in active[active.alive == False].iterrows():
+
+        # Only move inactive rows if they span more than 3 frames. 
+        if (i - row.start_frame) > 2:
+            compl_slice = pd.DataFrame({
+                "start_frame": row.start_frame,
+                "end_frame": i,
+                "xvals": [row.xvals],
+                "yvals": [row.yvals]
+            })
+            print(compl_slice)
+            print(len(compl_slice.xvals.str), len(compl_slice.yvals.str))
+            active.drop(index, inplace=True)
+
+        # Dismiss otherwise. (Assume lifetime greater than (3.65*2) = 7.3 seconds)
+        else:
+            active.drop(index, inplace=True)
+
+    # Reset the index to make up for the dropped frames
+    active.reset_index()
+
+
+
+    # print(active)
 
 
 
 
 
-
-
-
-
-
-
+## TODO next time, move to completed - and figure out why we're not finding new creations. Check what the content of start_frame is each loop.
 
 
 
