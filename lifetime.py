@@ -198,8 +198,7 @@ for i in range(120):
                 "xvals": [row.xvals],
                 "yvals": [row.yvals]
             })
-            print(compl_slice)
-            print(len(compl_slice.xvals.str), len(compl_slice.yvals.str))
+            completed = pd.concat([completed, compl_slice], ignore_index=True)
             active.drop(index, inplace=True)
 
         # Dismiss otherwise. (Assume lifetime greater than (3.65*2) = 7.3 seconds)
@@ -209,12 +208,8 @@ for i in range(120):
     # Reset the index to make up for the dropped frames
     active.reset_index()
 
-
-
-    # print(active)
-
-
-
+    # Print out the completed dataframe
+    print(completed)
 
 
 ## TODO next time, move to completed - and figure out why we're not finding new creations. Check what the content of start_frame is each loop.
