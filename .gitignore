@@ -24,3 +24,6 @@ notes_for_next_meeting
 fibril_analysis_paper/fibril_paper*
 !fibril_analysis_paper/fibril_paper.pdf
 !fibril_analysis_paper/fibril_paper.tex
+
+# Ignore .DS_Store
+*.DS_Store*
