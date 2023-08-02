@@ -1,17 +1,28 @@
+# Name: lifetime.py
+# Created: a few days ago
+# Description: Iterate over OCCULT-2 tracings and match them together. Generate "active"
+#              and "completed" DataFrames which contain frame-based lifetime information. 
+
 import csv
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import scipy.spatial.distance as dist
+import scipy.stats as stats
 
 # Initial variables
+init_frame = 0
+final_frame = 120
 max_coordinate_distance = 20
-max_completed_distance = 50
+max_completed_distance = 10
+save_figures = False                # Save figures to ts_res/lifetime
+match_completed = True              # Match completed features to one another across time gaps
+generate_normdist = True            # Generate normal distribution functions
 
-# Load the Hessian tracings to memory
+# Load the Hessian tracings to memory 
 tracings = []
-for i in range(0,4):
+for i in range(init_frame, final_frame):
     with open("ts_res/hess/{}.csv".format(i)) as csvfile:
         f = csv.reader(csvfile)
         columns = ['f_num', 'x', 'y']
@@ -45,7 +56,7 @@ active = pd.DataFrame({'start_frame': 0,
 f = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data
 
 # Start the matching process
-for i in range(0,4):
+for i in range(init_frame, final_frame):
     # Skip the 0th frame
     if i == 0:
         continue
@@ -212,125 +223,162 @@ for i in range(0,4):
     active.reset_index()
     completed.reset_index()
 
-    # Clear the plot
-    plt.cla()
+    if save_figures:
+        print("Saving figure {} to ts_res/lifetime/".format(i))
 
-    # Let's try plotting everything.
-    plt.imshow(f[i,:,:], origin="lower")
-    
-    # Plot the unmatched fibrils
-    xs = []
-    ys = []
-    for uniq in tracings[i-1].f_num.unique():
-        x = tracings[i-1][tracings[i-1].f_num == uniq].x.tolist()
-        y = tracings[i-1][tracings[i-1].f_num == uniq].y.tolist()
-        xs.extend(x)
-        ys.extend(y)
-        xs.append(None)
-        ys.append(None)
-    plt.plot(xs, ys, color="blue")
+        # Clear the plot
+        plt.cla()
 
-    # Plot the active fibrils
-    xs = []
-    ys = []
-    for index, row in active.iterrows():
-        coord_index = (i - row.start_frame) - 1
-        x = row.xvals[coord_index]
-        y = row.yvals[coord_index]
-        xs.extend(x)
-        ys.extend(y)
-        xs.append(None)
-        ys.append(None)
-    plt.plot(xs, ys, color="red")
+        # Let's try plotting everything.
+        plt.imshow(f[i,:,:], origin="lower")
+        
+        # Plot the unmatched fibrils
+        xs = []
+        ys = []
+        for uniq in tracings[i-1].f_num.unique():
+            x = tracings[i-1][tracings[i-1].f_num == uniq].x.tolist()
+            y = tracings[i-1][tracings[i-1].f_num == uniq].y.tolist()
+            xs.extend(x)
+            ys.extend(y)
+            xs.append(None)
+            ys.append(None)
+        plt.plot(xs, ys, color="blue")
 
-    # Plot the completed fibrils
-    xs = []
-    ys = []
-    for index, row in completed[(completed.start_frame <= i) & (completed.end_frame >= i)].iterrows():
-        coord_index = (i - row.start_frame) - 1
-        x = row.xvals[coord_index]
-        y = row.yvals[coord_index]
-        xs.extend(x)
-        ys.extend(y)
-        xs.append(None)
-        ys.append(None)
-    plt.plot(xs, ys, color="green")
-    # plt.savefig("ts_res/lifetime/{}.png".format(i), format="png")
-    # plt.show()
+        # Plot the active fibrils
+        xs = []
+        ys = []
+        for index, row in active.iterrows():
+            coord_index = (i - row.start_frame) - 1
+            x = row.xvals[coord_index]
+            y = row.yvals[coord_index]
+            xs.extend(x)
+            ys.extend(y)
+            xs.append(None)
+            ys.append(None)
+        plt.plot(xs, ys, color="red")
 
-# Start "completed matching" - match completed sets to one another to account for changes in seeing
-completed.insert(4, "mean_x", 0.0)
-completed.insert(5, "mean_y", 0.0)
-for index, row in completed.iterrows():
-    xs = row.xvals
-    ys = row.yvals
-    for fx,fy in zip(xs,ys):
-        xm = np.mean(fx)
-        ym = np.mean(fy)
-        row.mean_x += xm
-        row.mean_y += ym
-    row.mean_x = row.mean_x / (row.end_frame - row.start_frame)
-    row.mean_y = row.mean_y / (row.end_frame - row.start_frame)
+        # Plot the completed fibrils
+        xs = []
+        ys = []
+        for index, row in completed[(completed.start_frame <= i) & (completed.end_frame >= i)].iterrows():
+            coord_index = (i - row.start_frame) - 1
+            x = row.xvals[coord_index]
+            y = row.yvals[coord_index]
+            xs.extend(x)
+            ys.extend(y)
+            xs.append(None)
+            ys.append(None)
+        plt.plot(xs, ys, color="green")
+        plt.savefig("ts_res/lifetime/{}.png".format(i), format="png")
 
-    # Set the x,y mean values as the row iteration is just a copy
-    completed.loc[index, 'mean_x'] = row.mean_x
-    completed.loc[index, 'mean_y'] = row.mean_y
+# Save completed dataframe + active dataframe
+completed.to_csv("ts_res/lifetime_pdf/completed.csv")
+active.to_csv("ts_res/lifetime_pdf/active.csv")
 
-# Iterate over rows & combine those less than max_completed_distance away with one another
-completed.insert(6, 'matching_inds', np.empty((len(completed), 0)).tolist())
+# if match_completed:
+#     # Start "completed matching" - match completed sets to one another to account for changes in seeing
+#     print("Matching completed features")
+#     completed.insert(4, "mean_x", 0.0)
+#     completed.insert(5, "mean_y", 0.0)
+#     for index, row in completed.iterrows():
+#         xs = row.xvals
+#         ys = row.yvals
+#         for fx,fy in zip(xs,ys):
+#             xm = np.mean(fx)
+#             ym = np.mean(fy)
+#             row.mean_x += xm
+#             row.mean_y += ym
+#         row.mean_x = row.mean_x / (row.end_frame - row.start_frame)
+#         row.mean_y = row.mean_y / (row.end_frame - row.start_frame)
 
-for index, row in completed.iterrows():
-    mxs = completed.mean_x
-    mys = completed.mean_y
-    mcoords = np.array([completed.mean_x, completed.mean_y]).T
+#         # Set the x,y mean values as the row iteration is just a copy
+#         completed.loc[index, 'mean_x'] = row.mean_x
+#         completed.loc[index, 'mean_y'] = row.mean_y
 
-    # Reduce mcoords array
-    mc_reduced = mcoords[np.where(
-        (abs(mcoords[:,0]-row.mean_x) < max_completed_distance) &
-        (abs(mcoords[:,1]-row.mean_y) < max_completed_distance)
-    )]
+#     # Iterate over rows & combine those less than max_completed_distance away with one another
+#     completed.insert(6, 'matching_inds', np.empty((len(completed), 0)).tolist())
 
-    # Calculate Euclidean distance to all filtered coordinates
-    dists = dist.cdist(np.array([[row.mean_x],[row.mean_y]]).T, mc_reduced)
-    dists_full = np.concatenate((dists.T, mc_reduced), axis=1)
-    try:
-        # Use np.where() to filter out self (where distance would of course be zero)
-        matched_features = dists_full[np.where((dists_full[:,0] > 0) & (dists_full[:,0] < max_completed_distance))]
-    except ValueError:
-        # If there are no matches within max_coordinate_distance pixels. We could be more informative and provide a 
-        # quantative percentage here. 
-        continue
+#     for index, row in completed.iterrows():
+#         mxs = completed.mean_x
+#         mys = completed.mean_y
 
-    # If we're at this point, one or more matching completed features have been found. Find & associate indexes with the current feature.
-    matching_indexes = []
-    for r in matched_features:
-        mid = completed.index[(completed.mean_x == r[1]) & (completed.mean_y == r[2])].tolist()
-        matching_indexes.extend(mid)
-    completed.loc[index, 'matching_inds'].extend(matching_indexes)
+#         # mcoords contains the mean coordinates - mcoords_se contains the start/end frames for later filtering
+#         mcoords = np.array([completed.mean_x, completed.mean_y]).T
+#         mcoords_se = np.array([completed.start_frame, completed.end_frame]).T
 
-# Lifetimes of completed (no matching inds)
-# Pandas has no built-in method to evaluate the length of a contained list; hence the .map usage. 
-cmp_noind = completed[completed['matching_inds'].map(len) == 0]
-lt_cmp_noind = (cmp_noind.end_frame - cmp_noind.start_frame).tolist()
+#         # Reduce mcoords + mcoords_se array
+#         mc_reduced = mcoords[np.where(
+#             (abs(mcoords[:,0]-row.mean_x) < max_completed_distance) &
+#             (abs(mcoords[:,1]-row.mean_y) < max_completed_distance)
+#         )]
+#         mcse_reduced = mcoords_se[np.where(
+#             (abs(mcoords[:,0]-row.mean_x) < max_completed_distance) &
+#             (abs(mcoords[:,1]-row.mean_y) < max_completed_distance)
+#         )]
 
-# Lifetimes of completed (with matching inds) 
-# We need to modify the DataFrame to include the lifetimes of the matched completeds
-cmp_ind = completed[completed['matching_inds'].map(len) > 0]
-cmp_ind.insert(7, 'start_frames', np.empty((len(cmp_ind), 0)).tolist())
-cmp_ind.insert(8, 'end_frames', np.empty((len(cmp_ind), 0)).tolist())
-cmp_ind.insert(9, 'consider', True)
+#         # Calculate Euclidean distance to all filtered coordinates
+#         dists = dist.cdist(np.array([[row.mean_x],[row.mean_y]]).T, mc_reduced)
+#         dists_full = np.concatenate((dists.T, mc_reduced, mcse_reduced), axis=1)
+#         try:
+#             # Use np.where() to filter out self (where distance would of course be zero)
+#             # Avoid frame intersection by:
+#             #   - End frame of matched features must preceed the start frame of current feature
+#             #   - End frame of current feature must preceed the start frame of matched features
+#             matched_features = dists_full[np.where(
+#                 (dists_full[:,0] > 0) & 
+#                 (dists_full[:,0] < max_completed_distance) &
+#                 ((dists_full[:,3] > row.end_frame) |
+#                 (dists_full[:,4] < row.start_frame))
+#                 )]
+#         except ValueError:
+#             # If there are no matches within max_coordinate_distance pixels. We could be more informative and provide a 
+#             # quantative percentage here. 
+#             continue
 
-# Create a copy to iterate over, to avoid modifying the DataFrame while iterating
-cmp_ind_cpy = cmp_ind.copy(deep=True)
+#         # If we're at this point, one or more matching completed features have been found. Find & associate indexes with the current feature.
+#         matching_indexes = []
+#         for r in matched_features:
+#             mid = completed.index[(completed.mean_x == r[1]) & (completed.mean_y == r[2])].tolist()
+#             matching_indexes.extend(mid)
+#         completed.loc[index, 'matching_inds'].extend(matching_indexes)
 
-# Add start and end frames to matched frames
-for index, row in cmp_ind_cpy.iterrows():
-    for ind in cmp_ind_cpy.matching_inds:
-        cmp_ind.loc[index, "start_frames"].append(cmp_ind_cpy.loc[ind, 'start_frame'])
-        cmp_ind.loc[index, "end_frames"].append(cmp_ind_cpy.loc[ind, 'end_frame'])
+#     # Lifetimes of completed (no matching inds)
+#     # Pandas has no built-in method to evaluate the length of a contained list; hence the .map usage. 
+#     cmp_noind = completed[completed['matching_inds'].map(len) == 0]
+#     lt_cmp_noind = (cmp_noind.end_frame - cmp_noind.start_frame).to_numpy()
 
+#     # Lifetimes of completed (with matching inds) 
+#     # We need to modify the DataFrame to include the lifetimes
+#     cmp_ind = completed[completed['matching_inds'].map(len) > 0]
+#     cmp_ind.insert(7, 'consider', True)
 
-lt_cmp_ind = []
+#     # Create an "extended" DataFrame
+#     complete_extended = pd.DataFrame(columns=["start_frames", "end_frames", "total_lifetime"])
+#     for index, row in cmp_ind.iterrows():
+#         if row.consider:
+#             # Get the matching completed feature indices
+#             inds = row.matching_inds
 
-# Lifetimes of still-active
-lt_active = (i - active.start_frame).tolist()
+#             # Set up initial values for start_frames, end_frames and total_lifetime
+#             start_frames = [row.start_frame]
+#             end_frames = [row.end_frame]
+#             total_lifetime = row.end_frame - row.start_frame
+            
+#             # Iterate over the matched features, and add their characteristics to this complete_extended entry
+#             for ind in inds:
+#                 sf = completed.loc[ind, "start_frame"]
+#                 ef = completed.loc[ind, "end_frame"]
+#                 start_frames.append(sf)
+#                 end_frames.append(ef)
+#                 total_lifetime += (ef - sf)
+
+#                 # Disable from future consideration
+#                 completed.loc[ind, "consider"] = False
+            
+#             # Set up a slice to append to completed_extended
+#             ce_slice = pd.DataFrame({
+#                 "start_frames": [[start_frames]],
+#                 "end_frames": [[end_frames]],
+#                 "total_lifetime": total_lifetime
+#             })
+#             complete_extended = pd.concat([complete_extended, ce_slice])
