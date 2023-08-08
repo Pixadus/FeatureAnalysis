@@ -25,32 +25,40 @@ tracings = []
 for i in range(init_frame, final_frame):
     with open("ts_res/hess/{}.csv".format(i)) as csvfile:
         f = csv.reader(csvfile)
-        columns = ['f_num', 'x', 'y']
+        columns = ['f_num', 'x', 'y', 'b', 'l']
         df = pd.DataFrame([row for row in f], columns=columns)
         df[columns] = df[columns].apply(pd.to_numeric)
-        df.insert(3, "match_id", None)
-        df.insert(4, "match_distance", 0.0)
+        df.insert(5, "match_id", None)
+        df.insert(6, "match_distance", 0.0)
         tracings.append(df)
 
 # Create empty completed DataFrame
-completed = pd.DataFrame(columns=["start_frame", "end_frame", "xvals", "yvals"])
+completed = pd.DataFrame(columns=["start_frame", "end_frame", "xvals", "yvals", "bvals", "lvals"])
 
 # Create active features DataFrame
 df = tracings[0]
 unique_ids = df['f_num'].unique()
 xs = []
 ys = []
+bs = []
+ls = []
 for i in unique_ids:
     x = df[df.f_num == i].x.tolist()
     y = df[df.f_num == i].y.tolist()
+    breadth = df[df.f_num == i].b.tolist()
+    length = df[df.f_num == i].l.tolist()
     xs.append(x)
     ys.append(y)
+    bs.append(breadth)
+    ls.append(length)
 active = pd.DataFrame({'start_frame': 0,
                         'f_nums': [i],
                         'xvals': [x],
                         'yvals': [y],
+                        'bvals': [b],
+                        'lvals': [l],
                         'alive': False,
-                    } for x,y,i in zip(xs, ys, unique_ids))
+                    } for x,y,b,l,i in zip(xs, ys, bs, ls, unique_ids))
 
 # Open timeseries for visualization purposes
 f = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data
@@ -170,16 +178,19 @@ for i in range(init_frame, final_frame):
 
                 x = ci[ci.f_num == mici[key]].x.tolist()
                 y = ci[ci.f_num == mici[key]].y.tolist()
+                b = ci[ci.f_num == mici[key]].b.tolist()
+                l = ci[ci.f_num == mici[key]].l.tolist()
 
                 # Check if key is already in active. 
                 if key in cf_fn:
-                    # Should never be duplicates. TODO confirm this. 
                     index = cf_fn.index(key)
 
                     # Add to the active entry
                     active.loc[index, 'f_nums'].append(mici[key])
                     active.loc[index, 'xvals'].append(x)
                     active.loc[index, 'yvals'].append(y)
+                    active.loc[index, 'bvals'].append(b)
+                    active.loc[index, 'lvals'].append(l)
                     active.loc[index, 'alive'] = True
 
                 # If not, create a new active row.
@@ -189,6 +200,8 @@ for i in range(init_frame, final_frame):
                             'f_nums': [[mici[key]]],
                             'xvals': [[x]],
                             'yvals': [[y]],
+                            'bvals': [[b]],
+                            'lvals': [[l]],
                             'alive': True
                         })
                     
@@ -210,7 +223,9 @@ for i in range(init_frame, final_frame):
                 "start_frame": row.start_frame,
                 "end_frame": i,
                 "xvals": [row.xvals],
-                "yvals": [row.yvals]
+                "yvals": [row.yvals],
+                "bvals": [row.bvals],
+                "lvals": [row.lvals]
             })
             completed = pd.concat([completed, compl_slice], ignore_index=True)
             active.drop(index, inplace=True)

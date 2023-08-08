@@ -16,9 +16,6 @@ max_completed_distance = 10         # Max completed distance to match completed 
 active = pd.read_csv("ts_res/lifetime_pdf/active.csv")
 completed = pd.read_csv("ts_res/lifetime_pdf/completed.csv")
 
-# Set up subplots
-fig, ax = plt.subplots(1, 3)
-
 # Results from active
 active_life = (120 - active.start_frame).to_numpy()
 
@@ -123,6 +120,9 @@ comp_life_match_mean = np.mean(comp_life_match)
 comp_life_match_std = np.std(comp_life_match)
 comp_life_match_pdf = stats.norm.pdf(comp_life_match, comp_life_match_mean, comp_life_match_std)
 print("Comp_match mean:", comp_life_match_mean, "Comp_match std:", comp_life_match_std)
+
+# Set up subplots
+fig, ax = plt.subplots(1, 3)
 
 # Plot results for active_life, comp_life_nomatch and comp_life_match
 ax[0].plot(active_life, active_life_pdf)

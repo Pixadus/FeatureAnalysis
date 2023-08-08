@@ -169,6 +169,7 @@ class Analysis:
                     prevcoord = 0
                 nextcoord = coords[nextcoord]
                 prevcoord = coords[prevcoord]
+                
                 # Calculate the slope at the coordinate
                 dy = nextcoord[1]-prevcoord[1]
                 dx = nextcoord[0]-prevcoord[0]
@@ -177,7 +178,10 @@ class Analysis:
                 nearest = self.find_nearest_edges(coord, nze)
                 
                 # Calculate angle of the slope from horizontal
-                slope_angle = np.arctan(dy/dx)
+                try:
+                    slope_angle = np.arctan(dy/dx)
+                except:
+                    continue
 
                 # Calculate edge angles relative to perpendicular axis of slope at coordinate
                 angles = self.calculate_edge_angles(nearest, slope_angle, coord)

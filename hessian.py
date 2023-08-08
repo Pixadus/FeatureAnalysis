@@ -10,21 +10,14 @@ mpl.rcParams['savefig.format'] = 'svg'
 mpl.rcParams['savefig.dpi'] = 300
 import matplotlib.animation as animation
 from astropy.io import fits
-from skimage import filters, data, color, morphology, segmentation, feature, measure, transform, restoration, exposure
+from skimage import filters, morphology, segmentation, feature, measure, transform, restoration, exposure
 from tracing.tracing import AutoTracingOCCULT
-from helper.functions import CurvatureSegmentation
-import shapely
-from scipy.signal import savgol_filter
-from scipy import ndimage
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import minimum_spanning_tree
-import itertools
+from analysis.analysis import Analysis
 
 # Open the file
 f_ts = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data
 
 for i in range(0, 120):
-    print(i)
     f = (f_ts[i]*180).astype(np.uint8)
 
     # f = (f[0,100:600,:500]*180).astype(np.uint8)
@@ -79,12 +72,29 @@ for i in range(0, 120):
     #                                         smoothing=1, iter_callback=cb)
     
     # Run OCCULT-2
+    print("Tracing frame {}".format(i))
     ls_occ = AutoTracingOCCULT(data=filt1).run(
         nsm1=6,
         ngap=3, 
         rmin=25,
         qthresh2=0
     )
+
+    # Convert tracings to a dictionary
+    f_num = 0
+    f_data = {}
+    for feature in ls_occ:
+        f_data[f_num] = []
+        for coord in feature:
+            c = {"coord" : (float(coord[0]), float(coord[1]))}
+            f_data[f_num].append(c)
+        f_num += 1
+
+    # Run analysis on the fibril
+    print("Running analysis on frame {}".format(i))
+    an = Analysis(f_sharpened, f_data)
+    an.set_opts()
+    res = an.run()
 
     # Plotting
     fig, ax = plt.subplots(1, 1)
@@ -95,15 +105,12 @@ for i in range(0, 120):
     ax.set_ylim(0, 1000)
                 
     # Plot OCCULT-2 tracings
+    print("Writing frame {} data to ts_res/hess/{}.csv".format(i,i))
     with open('ts_res/hess/{}.csv'.format(i), 'w') as csvfile:
         csvw = csv.writer(csvfile)
-        for feat in ls_occ:
-            fnum= ls_occ.index(feat)
-            x = [c[0] for c in feat]
-            y = [c[1] for c in feat]
-            for xi, yi in zip(x,y):
-                csvw.writerow([fnum, xi, yi])
-            ax.plot(x,y, color='cyan')
+        for fnum in res.keys():
+            for coord_dict in res[fnum]:
+                csvw.writerow([fnum, coord_dict['coord'][0], coord_dict['coord'][1], coord_dict['breadth'], coord_dict['length']])
 
     plt.savefig("ts_res/hess/{}.png".format(i), format='png')
     plt.close(fig)
