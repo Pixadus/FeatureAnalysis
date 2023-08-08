@@ -17,7 +17,8 @@ from analysis.analysis import Analysis
 # Open the file
 f_ts = fits.open("data/images/fits/nb.6563.ser_171115.bis.wid.23Apr2017.target2.all.fits")[0].data
 
-for i in range(0, 120):
+# Try running on good seeing frames
+for i in range(62, 87):
     f = (f_ts[i]*180).astype(np.uint8)
 
     # f = (f[0,100:600,:500]*180).astype(np.uint8)
@@ -105,13 +106,13 @@ for i in range(0, 120):
     ax.set_ylim(0, 1000)
                 
     # Plot OCCULT-2 tracings
-    print("Writing frame {} data to ts_res/hess/{}.csv".format(i,i))
+    print("Writing frame {} data to ts_res/hess_good/{}.csv".format(i,i))
     with open('ts_res/hess/{}.csv'.format(i), 'w') as csvfile:
         csvw = csv.writer(csvfile)
         for fnum in res.keys():
             for coord_dict in res[fnum]:
                 csvw.writerow([fnum, coord_dict['coord'][0], coord_dict['coord'][1], coord_dict['breadth'], coord_dict['length']])
 
-    plt.savefig("ts_res/hess/{}.png".format(i), format='png')
+    plt.savefig("ts_res/hess_good/{}.png".format(i), format='png')
     plt.close(fig)
     # plt.show()
